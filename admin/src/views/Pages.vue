@@ -134,10 +134,21 @@
       </nav>
     </div>
 
-    <div v-if="activeTab === 'pages'" class="mb-4 flex items-center gap-2">
-      <Button variant="primary" @click="openCreateModal">Добавить</Button>
-      <a :href="newUrl" class="text-slate-600 underline" target="_blank">Добавить в WP</a>
-      <a :href="listUrl" class="text-slate-600 underline" target="_blank">Открыть список в WP</a>
+    <div v-if="activeTab === 'pages'" class="mb-4 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <Button variant="primary" @click="openCreateModal">Добавить</Button>
+        <a :href="newUrl" class="text-slate-600 underline" target="_blank">Добавить в WP</a>
+        <a :href="listUrl" class="text-slate-600 underline" target="_blank">Открыть список в WP</a>
+      </div>
+      <button
+        @click="columnsModalOpen = true"
+        class="p-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
+        title="Настроить колонки"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
+        </svg>
+      </button>
     </div>
 
     <!-- Поиск и фильтры -->
@@ -245,6 +256,106 @@
         </div>
     </Modal>
 
+    <!-- Модальное окно настройки колонок -->
+    <Modal 
+      v-model="columnsModalOpen"
+      title="Настройка колонок"
+      size="md"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-slate-600 mb-4">
+          Перетащите колонки для изменения порядка. Отметьте колонки, которые хотите скрыть.
+        </p>
+        <div class="space-y-2">
+          <div 
+            v-for="(col, index) in tableColumns" 
+            :key="col.key"
+            :class="['flex items-center gap-3 p-2 border rounded transition-colors', dragIndex === index ? 'bg-blue-50 border-blue-300' : 'hover:bg-slate-50']"
+            draggable="true"
+            @dragstart="onDragStart(index, $event)"
+            @dragover.prevent="onDragOver(index, $event)"
+            @drop="onDrop(index, $event)"
+            @dragend="onDragEnd"
+          >
+            <div class="flex-shrink-0 text-slate-400 cursor-move">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </div>
+            <label class="flex-1 flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                v-model="col.visible"
+                @change="saveColumnsSettings"
+                class="rounded"
+              />
+              <span class="text-sm">{{ col.label }}</span>
+            </label>
+            <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1">
+                <span class="text-xs text-slate-500">Ширина:</span>
+                <input 
+                  type="text" 
+                  v-model="col.width"
+                  @change="saveColumnsSettings"
+                  @blur="validateWidth(col)"
+                  class="w-20 px-2 py-1 text-xs border rounded"
+                  placeholder="200px"
+                />
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <button
+                v-if="index > 0"
+                @click="moveColumn(index, -1)"
+                class="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded"
+                title="Вверх"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                </svg>
+              </button>
+              <button
+                v-if="index < tableColumns.length - 1"
+                @click="moveColumn(index, 1)"
+                class="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded"
+                title="Вниз"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end mt-6">
+        <Button variant="secondary" @click="resetColumnsSettings">Сбросить</Button>
+        <Button variant="primary" @click="columnsModalOpen = false">Готово</Button>
+      </div>
+    </Modal>
+
+    <!-- Глобальный тултип с fixed позиционированием -->
+    <div 
+      v-if="tooltip.visible"
+      class="fixed px-3 py-2 bg-slate-800 text-white text-xs rounded shadow-xl z-[99999] max-w-md pointer-events-none"
+      :style="{ 
+        left: tooltip.x + 'px', 
+        top: tooltip.y + 'px',
+        transform: 'translateX(-50%)'
+      }"
+    >
+      <div v-if="tooltip.isUrl">
+        <div v-for="(line, idx) in tooltip.lines" :key="idx" class="mb-1 last:mb-0 whitespace-nowrap overflow-hidden text-ellipsis" :title="line">{{ line }}</div>
+      </div>
+      <div v-else-if="tooltip.isList">
+        <div v-for="(row, rowIdx) in tooltip.rows" :key="rowIdx" class="mb-1 last:mb-0">
+          <span v-for="(item, itemIdx) in row" :key="itemIdx" class="mr-2 last:mr-0">{{ item }}<span v-if="itemIdx < row.length - 1">,</span></span>
+        </div>
+      </div>
+      <div v-else class="break-words">{{ tooltip.text }}</div>
+    </div>
+
     <div v-if="error" class="text-red-700 mb-2">{{ error }}</div>
     <div v-if="activeTab === 'pages'" class="overflow-auto">
       <table class="min-w-full text-sm">
@@ -253,11 +364,17 @@
             <th class="py-2 pr-4 w-8">
               <input type="checkbox" :checked="allSelected" @change="toggleSelectAll" />
             </th>
-            <th class="py-2 pr-4">Название</th>
-            <th class="py-2 pr-4">Папки</th>
-            <th class="py-2 pr-4">Поддомены</th>
-            <th class="py-2 pr-4">URL</th>
-            <th class="py-2 pr-4"></th>
+            <th 
+              v-for="col in orderedVisibleColumns" 
+              :key="col.key" 
+              class="py-2 pr-4 overflow-hidden"
+              :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+            >
+              {{ col.label }}
+            </th>
+            <th class="py-2 pr-4 sticky right-0 bg-white z-10 border-l border-slate-200">
+              Действия
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -265,60 +382,148 @@
             <td class="py-2 pr-4">
               <input type="checkbox" :value="p.id" v-model="selectedIds" />
             </td>
-            <td class="py-2 pr-4">
-              <div class="relative">
-                <button 
-                  @click.stop="showEditMenu(p, $event)"
-                  :data-edit-menu-button="p.id"
-                  :data-page-id="p.id"
-                  class="underline hover:text-blue-600 cursor-pointer"
-                  v-html="highlightText(p.title, tableSearchQuery)"
-                ></button>
-                <div 
-                  v-if="editMenuId === p.id" 
-                  :data-edit-menu-id="p.id"
-                  class="absolute z-50 mt-1 bg-white border rounded shadow-lg p-2 min-w-[200px]"
-                  @click.stop
-                >
+            <template v-for="col in orderedVisibleColumns" :key="col.key">
+              <td 
+                v-if="col.key === 'title'" 
+                class="py-2 pr-4 overflow-hidden"
+                :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              >
+                <div class="relative">
                   <button 
-                    @click="editInWp(p)"
-                    class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                    @click.stop="showEditMenu(p, $event)"
+                    :data-edit-menu-button="p.id"
+                    :data-page-id="p.id"
+                    class="underline hover:text-blue-600 cursor-pointer"
+                    v-html="highlightText(p.title, tableSearchQuery)"
+                  ></button>
+                  <div 
+                    v-if="editMenuId === p.id" 
+                    :data-edit-menu-id="p.id"
+                    class="absolute z-50 mt-1 bg-white border rounded shadow-lg p-2 min-w-[200px]"
+                    @click.stop
                   >
-                    📝 Редактировать в WordPress
-                  </button>
-                  <button 
-                    @click="editInOurForm(p)"
-                    class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                  >
-                    ✏️ Редактировать в нашей форме
-                  </button>
-                  <button 
-                    @click="editMenuId = null; document.removeEventListener('click', closeEditMenuOnOutsideClick, true);"
-                    class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-slate-500"
-                  >
-                    Отмена
-                  </button>
+                    <button 
+                      @click="editInWp(p)"
+                      class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                    >
+                      📝 Редактировать в WordPress
+                    </button>
+                    <button 
+                      @click="editInOurForm(p)"
+                      class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                    >
+                      ✏️ Редактировать в нашей форме
+                    </button>
+                    <button 
+                      @click="editMenuId = null; document.removeEventListener('click', closeEditMenuOnOutsideClick, true);"
+                      class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-slate-500"
+                    >
+                      Отмена
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div class="text-slate-500" v-html="highlightText(p.slug, tableSearchQuery)"></div>
-            </td>
-            <td class="py-2 pr-4">
-              <div v-if="p.visibility?.folders?.length" v-html="highlightText(mapFolderIdsToSlugs(p.visibility.folders, p.folders).join(', '), tableSearchQuery)"></div>
-              <div v-else class="text-slate-500">—</div>
-            </td>
-            <td class="py-2 pr-4">
-              <div v-if="p.visibility?.subdomains?.length" v-html="highlightText(mapSubIdsToSlugs(p.visibility.subdomains, p.subdomains).join(', '), tableSearchQuery)"></div>
-              <div v-else class="text-slate-500">—</div>
-            </td>
-            <td class="py-2 pr-4">
-              <div v-if="p.urls?.length">
-                <div v-for="u in p.urls" :key="u">
-                  <a :href="u" target="_blank" class="underline" v-html="highlightText(u, tableSearchQuery)"></a>
+                <div class="text-slate-500" v-html="highlightText(p.slug, tableSearchQuery)"></div>
+              </td>
+              <td 
+                v-else-if="col.key === 'seo_title'" 
+                class="py-2 pr-4 overflow-hidden"
+                :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              >
+                <div v-if="p.seo_title" class="text-slate-600 text-xs truncate" :title="p.seo_title" v-html="highlightText(p.seo_title, tableSearchQuery)"></div>
+                <div v-else class="text-slate-500 text-xs">—</div>
+              </td>
+              <td 
+                v-else-if="col.key === 'seo_description'" 
+                class="py-2 pr-4 overflow-hidden"
+                :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              >
+                <div v-if="p.seo_description" class="text-slate-600 text-xs truncate" :title="p.seo_description" v-html="highlightText(p.seo_description, tableSearchQuery)"></div>
+                <div v-else class="text-slate-500 text-xs">—</div>
+              </td>
+              <td 
+                v-else-if="col.key === 'folders'" 
+                class="py-2 pr-4 overflow-hidden"
+                :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              >
+                <div v-if="p.visibility?.folders?.length" class="flex items-center gap-1 flex-wrap">
+                  <template v-for="(folderId, idx) in (hasSearchInFolders(p) ? p.visibility.folders : p.visibility.folders.slice(0, 2))" :key="folderId">
+                    <span 
+                      class="inline-block text-xs bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[80px]"
+                      :title="mapFolderIdsToSlugs([folderId], p.folders)[0]"
+                      v-html="highlightText(mapFolderIdsToSlugs([folderId], p.folders)[0], tableSearchQuery)"
+                    ></span>
+                  </template>
+                  <span 
+                    v-if="!hasSearchInFolders(p) && p.visibility.folders.length > 2"
+                    class="relative"
+                    @mouseenter="showTooltip($event, mapFolderIdsToSlugs(p.visibility.folders, p.folders).join(', '), 'list')"
+                    @mouseleave="hideTooltip()"
+                  >
+                    <span class="text-xs text-slate-500 cursor-help">
+                      +{{ p.visibility.folders.length - 2 }}
+                    </span>
+                  </span>
                 </div>
-              </div>
-              <div v-else class="text-slate-500">—</div>
-            </td>
-            <td class="py-2 pr-4">
+                <div v-else class="text-slate-500 text-xs">—</div>
+              </td>
+              <td 
+                v-else-if="col.key === 'subdomains'" 
+                class="py-2 pr-4 overflow-hidden"
+                :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              >
+                <div v-if="p.visibility?.subdomains?.length" class="flex items-center gap-1 flex-wrap">
+                  <template v-for="(subId, idx) in (hasSearchInSubdomains(p) ? p.visibility.subdomains : p.visibility.subdomains.slice(0, 2))" :key="subId">
+                    <span 
+                      class="inline-block text-xs bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[80px]"
+                      :title="mapSubIdsToSlugs([subId], p.subdomains)[0]"
+                      v-html="highlightText(mapSubIdsToSlugs([subId], p.subdomains)[0], tableSearchQuery)"
+                    ></span>
+                  </template>
+                  <span 
+                    v-if="!hasSearchInSubdomains(p) && p.visibility.subdomains.length > 2"
+                    class="relative"
+                    @mouseenter="showTooltip($event, mapSubIdsToSlugs(p.visibility.subdomains, p.subdomains).join(', '), 'list')"
+                    @mouseleave="hideTooltip()"
+                  >
+                    <span class="text-xs text-slate-500 cursor-help">
+                      +{{ p.visibility.subdomains.length - 2 }}
+                    </span>
+                  </span>
+                </div>
+                <div v-else class="text-slate-500 text-xs">—</div>
+              </td>
+              <td 
+                v-else-if="col.key === 'urls'" 
+                class="py-2 pr-4 overflow-hidden"
+                :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              >
+                <div v-if="p.urls?.length" class="space-y-0.5">
+                  <template v-for="(url, idx) in (hasSearchInUrls(p) ? p.urls : p.urls.slice(0, 1))" :key="url">
+                    <div class="text-xs">
+                      <a 
+                        :href="url" 
+                        target="_blank" 
+                        class="text-blue-600 hover:underline truncate block max-w-[150px]" 
+                        :title="url"
+                        v-html="highlightText(url.replace(/^https?:\/\//, '').replace(/\/$/, ''), tableSearchQuery)"
+                      ></a>
+                    </div>
+                  </template>
+                  <span 
+                    v-if="!hasSearchInUrls(p) && p.urls.length > 1"
+                    class="relative"
+                    @mouseenter="showTooltip($event, p.urls.slice(1).join('\\n'), 'url')"
+                    @mouseleave="hideTooltip()"
+                  >
+                    <span class="text-xs text-slate-500 cursor-help">
+                      +{{ p.urls.length - 1 }} URL
+                    </span>
+                  </span>
+                </div>
+                <div v-else class="text-slate-500 text-xs">—</div>
+              </td>
+            </template>
+            <td class="py-2 pr-4 sticky right-0 bg-white z-10 border-l border-slate-200">
               <div class="flex items-center gap-2">
                 <a 
                   :href="editUrl(p.id)"
@@ -1076,6 +1281,9 @@ const bulk = reactive({ rule: 'allow', folders: [], subdomains: [], selectedPage
 const allFolders = ref([]);
 const allSubdomains = ref([]);
 
+// Тултип с fixed позиционированием
+const tooltip = ref({ visible: false, text: '', x: 0, y: 0 });
+
 const tableSearchQuery = ref('');
 const tableFilterFolders = ref([]);
 const tableFilterSubdomains = ref([]);
@@ -1085,6 +1293,8 @@ const filtersModalOpen = ref(false);
 const tableFolderSearch = ref('');
 const tableSubdomainSearch = ref('');
 const bulkConfirmOpen = ref(false);
+const columnsModalOpen = ref(false);
+const dragIndex = ref(null);
 const createModalOpen = ref(false);
 const creating = ref(false);
 const createFolderSearch = ref('');
@@ -1128,6 +1338,180 @@ const editSubdomainSearch = ref('');
 const editSlugWasManuallyChanged = ref(false);
 
 const seoInfo = ref(null);
+
+// Настройки колонок таблицы
+// checkbox и actions всегда видимы и не участвуют в настройках
+const defaultColumns = [
+  { key: 'title', label: 'Название', visible: true, width: '200px' },
+  { key: 'seo_title', label: 'SEO Title', visible: true, width: '200px' },
+  { key: 'seo_description', label: 'SEO Description', visible: true, width: '250px' },
+  { key: 'folders', label: 'Папки', visible: true, width: '150px' },
+  { key: 'subdomains', label: 'Поддомены', visible: true, width: '150px' },
+  { key: 'urls', label: 'URL', visible: true, width: '200px' }
+];
+
+const tableColumns = ref(JSON.parse(JSON.stringify(defaultColumns)));
+
+
+// Вычисляем видимые колонки (checkbox и actions всегда видимы)
+const visibleColumns = computed(() => {
+  return tableColumns.value.filter(c => c.visible).map(c => c.key);
+});
+
+// Вычисляем упорядоченные видимые колонки для заголовков
+const orderedVisibleColumns = computed(() => {
+  return tableColumns.value.filter(c => c.visible);
+});
+
+// Сохраняем настройки колонок в localStorage
+function saveColumnsSettings() {
+  localStorage.setItem('mr_ml_table_columns', JSON.stringify(tableColumns.value));
+}
+
+// Сбрасываем настройки колонок
+function resetColumnsSettings() {
+  tableColumns.value = JSON.parse(JSON.stringify(defaultColumns));
+  saveColumnsSettings();
+}
+
+// Перемещение колонки (drag & drop)
+let draggedColumn = null;
+
+function onDragStart(index, event) {
+  dragIndex.value = index;
+  draggedColumn = { ...tableColumns.value[index] };
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragOver(index, event) {
+  event.preventDefault();
+  if (dragIndex.value !== null && dragIndex.value !== index && draggedColumn) {
+    const items = [...tableColumns.value];
+    items.splice(dragIndex.value, 1);
+    items.splice(index, 0, draggedColumn);
+    tableColumns.value = items;
+    dragIndex.value = index;
+  }
+}
+
+function onDrop(index, event) {
+  event.preventDefault();
+  onDragEnd();
+  saveColumnsSettings();
+}
+
+function onDragEnd() {
+  dragIndex.value = null;
+  draggedColumn = null;
+}
+
+// Перемещение колонки стрелками
+function moveColumn(index, direction) {
+  const newIndex = index + direction;
+  if (newIndex >= 0 && newIndex < tableColumns.value.length) {
+    const col = tableColumns.value[index];
+    tableColumns.value[index] = tableColumns.value[newIndex];
+    tableColumns.value[newIndex] = col;
+    saveColumnsSettings();
+  }
+}
+
+// Валидация и нормализация ширины колонки
+function validateWidth(col) {
+  if (!col.width || col.width.trim() === '') {
+    const defaultCol = defaultColumns.find(dc => dc.key === col.key);
+    col.width = defaultCol?.width || 'auto';
+    saveColumnsSettings();
+    return;
+  }
+  
+  // Проверяем формат: число + единица (px, %, em, rem, vw, vh)
+  const widthPattern = /^(\d+(?:\.\d+)?)(px|%|em|rem|vw|vh|auto)$/i;
+  if (!widthPattern.test(col.width.trim())) {
+    // Если формат неверный, пытаемся исправить
+    const numMatch = col.width.match(/\d+(?:\.\d+)?/);
+    if (numMatch) {
+      col.width = numMatch[0] + 'px';
+    } else {
+      const defaultCol = defaultColumns.find(dc => dc.key === col.key);
+      col.width = defaultCol?.width || 'auto';
+    }
+    saveColumnsSettings();
+  } else {
+    col.width = col.width.trim();
+    saveColumnsSettings();
+  }
+}
+
+// Проверка наличия поискового запроса в папках
+function hasSearchInFolders(page) {
+  if (!tableSearchQuery.value || !page.visibility?.folders?.length) return false;
+  const q = tableSearchQuery.value.toLowerCase();
+  return page.visibility.folders.some(folderId => {
+    const folderSlug = mapFolderIdsToSlugs([folderId], page.folders)[0] || '';
+    return folderSlug.toLowerCase().includes(q);
+  });
+}
+
+// Проверка наличия поискового запроса в поддоменах
+function hasSearchInSubdomains(page) {
+  if (!tableSearchQuery.value || !page.visibility?.subdomains?.length) return false;
+  const q = tableSearchQuery.value.toLowerCase();
+  return page.visibility.subdomains.some(subId => {
+    const subSlug = mapSubIdsToSlugs([subId], page.subdomains)[0] || '';
+    return subSlug.toLowerCase().includes(q);
+  });
+}
+
+// Проверка наличия поискового запроса в URL
+function hasSearchInUrls(page) {
+  if (!tableSearchQuery.value || !page.urls?.length) return false;
+  const q = tableSearchQuery.value.toLowerCase();
+  return page.urls.some(url => {
+    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return cleanUrl.toLowerCase().includes(q) || url.toLowerCase().includes(q);
+  });
+}
+
+// Тултип с fixed позиционированием
+function showTooltip(event, text, type = 'text') {
+  const rect = event.currentTarget.getBoundingClientRect();
+  
+  let tooltipData = {
+    visible: true,
+    text: text,
+    x: rect.left + (rect.width / 2),
+    y: rect.top + rect.height + 8
+  };
+  
+  if (type === 'url') {
+    // Для URL - каждое значение на отдельной строке без переноса
+    const urls = text.split('\\n');
+    tooltipData = {
+      ...tooltipData,
+      isUrl: true,
+      lines: urls
+    };
+  } else if (type === 'list') {
+    // Для папок/поддоменов - по 5 элементов на строку
+    const items = text.split(', ').filter(Boolean);
+    const rows = [];
+    for (let i = 0; i < items.length; i += 5) {
+      rows.push(items.slice(i, i + 5));
+    }
+    tooltipData = {
+      ...tooltipData,
+      isList: true,
+      rows: rows
+    };
+  }
+  
+  tooltip.value = tooltipData;
+}
+
+function hideTooltip() {
+  tooltip.value.visible = false;
+}
 
 // Функция транслитерации для создания слага
 function transliterateToSlug(text) {
@@ -1191,6 +1575,51 @@ watch(() => newPage.title, (newTitle, oldTitle) => {
 // Отслеживание ручного изменения слага происходит через события @focus и @input на Input
 
 onMounted(async () => {
+  // Загружаем настройки колонок из localStorage
+  const saved = localStorage.getItem('mr_ml_table_columns');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === defaultColumns.length) {
+        // Восстанавливаем порядок и видимость из сохраненных данных
+        const savedKeys = parsed.map(c => c.key);
+        const ordered = savedKeys.map(key => {
+          const savedCol = parsed.find(c => c.key === key);
+          const defaultCol = defaultColumns.find(c => c.key === key);
+          if (defaultCol) {
+            return {
+              ...defaultCol,
+              visible: savedCol?.visible !== undefined ? savedCol.visible : defaultCol.visible
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        // Добавляем недостающие колонки (если были добавлены новые)
+        defaultColumns.forEach(col => {
+          if (!ordered.find(c => c.key === col.key)) {
+            ordered.push({ ...col });
+          }
+        });
+        tableColumns.value = ordered;
+      } else if (Array.isArray(parsed) && parsed.length > 0) {
+        // Если в сохраненных данных есть старые колонки (checkbox, actions), фильтруем их
+        const filtered = parsed.filter(c => c.key !== 'checkbox' && c.key !== 'actions');
+        if (filtered.length === defaultColumns.length) {
+          tableColumns.value = filtered.map(col => {
+            const defaultCol = defaultColumns.find(dc => dc.key === col.key);
+            return defaultCol ? { 
+              ...defaultCol, 
+              visible: col.visible !== undefined ? col.visible : defaultCol.visible,
+              width: col.width || defaultCol.width || 'auto'
+            } : null;
+          }).filter(Boolean);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load column settings:', e);
+    }
+  }
+  
   await load();
   await loadFolders();
   await loadSubdomains();

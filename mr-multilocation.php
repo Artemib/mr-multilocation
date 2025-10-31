@@ -438,10 +438,45 @@ function mr_ml_register_rest_routes(): void {
 				foreach ( $q->posts as $p ) {
 					$vis = get_post_meta( $p->ID, '_mr_ml_visibility', true );
 					$urls = mr_ml_generate_urls_for_post( $p );
+					
+					// Получаем SEO мета-данные
+					$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+					$detected = mr_ml_detect_seo_plugins();
+					$seo_plugin = null;
+					if ( ! empty( $detected ) && ! empty( $active_seo ) ) {
+						foreach ( $detected as $sp ) {
+							if ( $sp['type'] === $active_seo ) {
+								$seo_plugin = $sp;
+								break;
+							}
+						}
+					}
+					
+					// Читаем SEO данные
+					$builtin_seo_title = get_post_meta( $p->ID, '_mr_ml_seo_title', true );
+					$builtin_seo_description = get_post_meta( $p->ID, '_mr_ml_seo_description', true );
+					
+					$seo_title = $builtin_seo_title;
+					$seo_description = $builtin_seo_description;
+					
+					// Если есть синхронизация с SEO-плагином, читаем оттуда (приоритет)
+					if ( $seo_plugin ) {
+						$plugin_title = get_post_meta( $p->ID, $seo_plugin['meta_title'], true );
+						$plugin_description = get_post_meta( $p->ID, $seo_plugin['meta_description'], true );
+						if ( ! empty( $plugin_title ) ) {
+							$seo_title = $plugin_title;
+						}
+						if ( ! empty( $plugin_description ) ) {
+							$seo_description = $plugin_description;
+						}
+					}
+					
 					$items[] = array(
 						'id' => (int)$p->ID,
 						'title' => get_the_title($p),
 						'slug' => $p->post_name,
+						'seo_title' => $seo_title ?: '',
+						'seo_description' => $seo_description ?: '',
 						'visibility' => is_array($vis) ? $vis : array(),
 						'urls' => $urls,
 						'folders' => $fols,
