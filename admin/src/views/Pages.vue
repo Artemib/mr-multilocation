@@ -140,7 +140,40 @@
               <input type="checkbox" :value="p.id" v-model="selectedIds" />
             </td>
             <td class="py-2 pr-4">
-              <a :href="editUrl(p.id)" target="_blank" class="underline" v-html="highlightText(p.title, tableSearchQuery)"></a>
+              <div class="relative">
+                <button 
+                  @click.stop="showEditMenu(p, $event)"
+                  :data-edit-menu-button="p.id"
+                  :data-page-id="p.id"
+                  class="underline hover:text-blue-600 cursor-pointer"
+                  v-html="highlightText(p.title, tableSearchQuery)"
+                ></button>
+                <div 
+                  v-if="editMenuId === p.id" 
+                  :data-edit-menu-id="p.id"
+                  class="absolute z-50 mt-1 bg-white border rounded shadow-lg p-2 min-w-[200px]"
+                  @click.stop
+                >
+                  <button 
+                    @click="editInWp(p)"
+                    class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                  >
+                    📝 Редактировать в WordPress
+                  </button>
+                  <button 
+                    @click="editInOurForm(p)"
+                    class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+                  >
+                    ✏️ Редактировать в нашей форме
+                  </button>
+                  <button 
+                    @click="editMenuId = null; document.removeEventListener('click', closeEditMenuOnOutsideClick, true);"
+                    class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-slate-500"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
               <div class="text-slate-500" v-html="highlightText(p.slug, tableSearchQuery)"></div>
             </td>
             <td class="py-2 pr-4">
@@ -160,7 +193,7 @@
               <div v-else class="text-slate-500">—</div>
             </td>
             <td class="py-2 pr-4">
-              <Button variant="secondary" size="sm" @click="openEditModal(p)">Настроить</Button>
+              <Button variant="secondary" size="sm" @click="editInOurForm(p)">Настроить</Button>
             </td>
           </tr>
         </tbody>
@@ -177,83 +210,6 @@
       @update:items-per-page="itemsPerPage = $event"
     />
 
-    <!-- Модальное окно редактирования -->
-    <Modal 
-      v-model="editingModalOpen"
-      :title="`Настройка видимости: ${editing?.title || ''}`"
-      size="lg"
-    >
-        <div class="mb-4">
-          <label class="text-slate-600 mr-2">Правило:</label>
-          <Select v-model="editing._draft.rule">
-            <option value="all">Показывать везде</option>
-            <option value="allow">Только выбранные</option>
-            <option value="deny">Скрывать выбранные</option>
-          </Select>
-        </div>
-        <div v-if="editing._draft.rule !== 'all'" class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-slate-600">Папки</div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                @click="toggleAllFolders"
-                class="text-xs"
-              >
-                {{ allFoldersSelected ? 'Снять все' : 'Выбрать все' }}
-              </Button>
-            </div>
-            <Input 
-              v-model="searchFolderQuery" 
-              placeholder="Поиск папок..." 
-              size="sm"
-              class="w-full mb-2"
-            />
-            <div class="text-xs text-slate-500 mb-1">
-              Показано: {{ filteredFolders.length }} из {{ (editing?.folders || allFolders).length }}
-            </div>
-            <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
-              <label v-for="f in filteredFolders" :key="f.id" class="block mb-1">
-                <input type="checkbox" :value="Number(f.id)" v-model="editing._draft.folders" /> <span v-html="highlightText(f.slug, searchFolderQuery)"></span>
-              </label>
-              <div v-if="filteredFolders.length === 0" class="text-slate-500 text-xs">Не найдено</div>
-            </div>
-          </div>
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-slate-600">Поддомены</div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                @click="toggleAllSubdomains"
-                class="text-xs"
-              >
-                {{ allSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
-              </Button>
-            </div>
-            <Input 
-              v-model="searchSubdomainQuery" 
-              placeholder="Поиск поддоменов..." 
-              size="sm"
-              class="w-full mb-2"
-            />
-            <div class="text-xs text-slate-500 mb-1">
-              Показано: {{ filteredSubdomains.length }} из {{ (editing?.subdomains || allSubdomains).length }}
-            </div>
-            <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
-              <label v-for="s in filteredSubdomains" :key="s.id" class="block mb-1">
-                <input type="checkbox" :value="Number(s.id)" v-model="editing._draft.subdomains" /> <span v-html="highlightText(s.slug, searchSubdomainQuery)"></span>
-              </label>
-              <div v-if="filteredSubdomains.length === 0" class="text-slate-500 text-xs">Не найдено</div>
-            </div>
-          </div>
-        </div>
-        <div class="flex gap-2 justify-end">
-          <Button variant="secondary" @click="closeEditModal">Отмена</Button>
-          <Button variant="primary" @click="saveVis(editing)">Сохранить</Button>
-        </div>
-    </Modal>
 
     <!-- Модальное окно массовых настроек -->
     <Modal 
@@ -411,6 +367,36 @@
           ></textarea>
         </div>
 
+        <!-- SEO метаданные -->
+        <div class="border-t pt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-medium text-slate-700">SEO метаданные</h4>
+            <span v-if="seoInfo && seoInfo.seoPlugin" class="text-xs text-slate-500">
+              Синхронизация с {{ seoInfo.seoPlugin.name }}
+            </span>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">SEO Title</label>
+              <Input 
+                v-model="newPage.seoTitle" 
+                placeholder="Введите SEO заголовок..."
+                class="w-full"
+              />
+              <p class="text-xs text-slate-500 mt-1">Рекомендуемая длина: 50-60 символов</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">SEO Description</label>
+              <textarea 
+                v-model="newPage.seoDescription" 
+                placeholder="Введите SEO описание..."
+                class="w-full border rounded px-3 py-2 h-24 resize-none"
+              ></textarea>
+              <p class="text-xs text-slate-500 mt-1">Рекомендуемая длина: 150-160 символов</p>
+            </div>
+          </div>
+        </div>
+
         <div class="border-t pt-4">
           <div class="mb-4">
             <label class="block text-sm font-medium text-slate-700 mb-2">Видимость страницы</label>
@@ -489,6 +475,166 @@
         </Button>
       </div>
     </Modal>
+
+    <!-- Модальное окно редактирования страницы -->
+    <Modal 
+      v-model="editPageModalOpen"
+      :title="`Редактирование: ${editPage.title || ''}`"
+      size="lg"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Название</label>
+          <Input 
+            v-model="editPage.title" 
+            placeholder="Введите название страницы..."
+            class="w-full"
+          />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Слаг</label>
+          <div class="flex items-center gap-2">
+            <Input 
+              v-model="editPage.slug" 
+              placeholder="page-slug"
+              class="flex-1"
+              @focus="editSlugWasManuallyChanged = true"
+              @input="editSlugWasManuallyChanged = true"
+            />
+            <button 
+              @click="regenerateEditSlug"
+              class="p-2 border rounded hover:bg-slate-100 transition-colors"
+              title="Регенерировать слаг из названия"
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </button>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">
+            Слаг автоматически генерируется из названия при вводе. Используйте кнопку ↻ для перегенерации из текущего названия.
+          </p>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Контент</label>
+          <textarea 
+            v-model="editPage.content" 
+            placeholder="Введите содержимое страницы..."
+            class="w-full border rounded px-3 py-2 h-32 resize-none"
+          ></textarea>
+        </div>
+
+        <!-- SEO метаданные -->
+        <div class="border-t pt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-medium text-slate-700">SEO метаданные</h4>
+            <span v-if="editSeoInfo && editSeoInfo.seoPlugin" class="text-xs text-slate-500">
+              Синхронизация с {{ editSeoInfo.seoPlugin.name }}
+            </span>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">SEO Title</label>
+              <Input 
+                v-model="editPage.seoTitle" 
+                placeholder="Введите SEO заголовок..."
+                class="w-full"
+              />
+              <p class="text-xs text-slate-500 mt-1">Рекомендуемая длина: 50-60 символов</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">SEO Description</label>
+              <textarea 
+                v-model="editPage.seoDescription" 
+                placeholder="Введите SEO описание..."
+                class="w-full border rounded px-3 py-2 h-24 resize-none"
+              ></textarea>
+              <p class="text-xs text-slate-500 mt-1">Рекомендуемая длина: 150-160 символов</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t pt-4">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-slate-700 mb-2">Видимость страницы</label>
+            <Select v-model="editPage.visibilityRule" class="w-full mb-4">
+              <option value="all">Показывать везде</option>
+              <option value="allow">Только выбранные</option>
+              <option value="deny">Скрывать выбранные</option>
+            </Select>
+          </div>
+          
+          <div v-if="editPage.visibilityRule !== 'all'" class="grid grid-cols-2 gap-4">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-slate-600 font-medium">Папки</div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  @click="toggleAllEditFolders"
+                  class="text-xs"
+                >
+                  {{ allEditFoldersSelected ? 'Снять все' : 'Выбрать все' }}
+                </Button>
+              </div>
+              <Input 
+                v-model="editFolderSearch" 
+                placeholder="Поиск папок..." 
+                size="sm"
+                class="w-full mb-2"
+              />
+              <div class="text-xs text-slate-500 mb-1">
+                Показано: {{ filteredEditFolders.length }} из {{ allFolders.length }}
+              </div>
+              <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
+                <label v-for="f in filteredEditFolders" :key="f.id" class="block mb-1">
+                  <input type="checkbox" :value="Number(f.id)" v-model="editPage.folders" /> <span v-html="highlightText(f.slug, editFolderSearch)"></span>
+                </label>
+                <div v-if="filteredEditFolders.length === 0" class="text-slate-500 text-xs">Не найдено</div>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-slate-600 font-medium">Поддомены</div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  @click="toggleAllEditSubdomains"
+                  class="text-xs"
+                >
+                  {{ allEditSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
+                </Button>
+              </div>
+              <Input 
+                v-model="editSubdomainSearch" 
+                placeholder="Поиск поддоменов..." 
+                size="sm"
+                class="w-full mb-2"
+              />
+              <div class="text-xs text-slate-500 mb-1">
+                Показано: {{ filteredEditSubdomains.length }} из {{ allSubdomains.length }}
+              </div>
+              <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
+                <label v-for="s in filteredEditSubdomains" :key="s.id" class="block mb-1">
+                  <input type="checkbox" :value="Number(s.id)" v-model="editPage.subdomains" /> <span v-html="highlightText(s.slug, editSubdomainSearch)"></span>
+                </label>
+                <div v-if="filteredEditSubdomains.length === 0" class="text-slate-500 text-xs">Не найдено</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex gap-2 justify-end mt-6">
+        <Button variant="secondary" @click="closeEditPageModal">Отмена</Button>
+        <Button variant="primary" @click="updatePage" :disabled="!editPage.title || updating">
+          {{ updating ? 'Сохранение...' : 'Сохранить' }}
+        </Button>
+      </div>
+    </Modal>
   </div>
 </template>
 
@@ -503,11 +649,6 @@ const error = ref('');
 const listUrl = `${boot.adminUrl}edit.php?post_type=multiregional_page`;
 const newUrl = `${boot.adminUrl}post-new.php?post_type=multiregional_page`;
 const editUrl = (id) => `${boot.adminUrl}post.php?post=${id}&action=edit`;
-const editing = ref(null);
-const editingModalOpen = computed({
-  get: () => !!editing.value,
-  set: (val) => { if (!val) editing.value = null; }
-});
 const bulkModalOpen = ref(false);
 const searchQuery = ref('');
 const selectedIds = ref([]);
@@ -535,8 +676,32 @@ const newPage = reactive({
   content: '',
   visibilityRule: 'all',
   folders: [],
-  subdomains: []
+  subdomains: [],
+  seoTitle: '',
+  seoDescription: ''
 });
+
+const editMenuId = ref(null);
+const editPageModalOpen = ref(false);
+const editingPage = ref(null);
+const updating = ref(false);
+const editPage = reactive({
+  id: null,
+  title: '',
+  slug: '',
+  content: '',
+  visibilityRule: 'all',
+  folders: [],
+  subdomains: [],
+  seoTitle: '',
+  seoDescription: ''
+});
+const editSeoInfo = ref(null);
+const editFolderSearch = ref('');
+const editSubdomainSearch = ref('');
+const editSlugWasManuallyChanged = ref(false);
+
+const seoInfo = ref(null);
 
 // Функция транслитерации для создания слага
 function transliterateToSlug(text) {
@@ -601,6 +766,14 @@ watch(() => newPage.title, (newTitle, oldTitle) => {
 
 onMounted(async () => {
   await load();
+  await loadFolders();
+  await loadSubdomains();
+  window.addEventListener('click', handleClickOutside);
+});
+onUnmounted(() => {
+  window.removeEventListener('click', handleClickOutside);
+  // Убираем обработчик закрытия меню, если он был добавлен
+  document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
 });
 
 const tableFilteredItems = computed(() => {
@@ -685,26 +858,15 @@ const filteredItems = computed(() => {
 const searchFolderQuery = ref('');
 const searchSubdomainQuery = ref('');
 const filteredFolders = computed(() => {
-  const source = editing.value && editing.value.folders ? editing.value.folders : allFolders.value;
-  if (!searchFolderQuery.value.trim()) return source;
+  if (!searchFolderQuery.value.trim()) return allFolders.value;
   const q = searchFolderQuery.value.toLowerCase();
-  return source.filter(f => f.slug.toLowerCase().includes(q) || (f.name && f.name.toLowerCase().includes(q)));
+  return allFolders.value.filter(f => f.slug.toLowerCase().includes(q) || (f.name && f.name.toLowerCase().includes(q)));
 });
+
 const filteredSubdomains = computed(() => {
-  const source = editing.value && editing.value.subdomains ? editing.value.subdomains : allSubdomains.value;
-  if (!searchSubdomainQuery.value.trim()) return source;
+  if (!searchSubdomainQuery.value.trim()) return allSubdomains.value;
   const q = searchSubdomainQuery.value.toLowerCase();
-  return source.filter(s => s.slug.toLowerCase().includes(q) || (s.name && s.name.toLowerCase().includes(q)));
-});
-
-const allFoldersSelected = computed(() => {
-  if (!editing.value || !filteredFolders.value.length) return false;
-  return filteredFolders.value.every(f => editing.value._draft.folders.includes(Number(f.id)));
-});
-
-const allSubdomainsSelected = computed(() => {
-  if (!editing.value || !filteredSubdomains.value.length) return false;
-  return filteredSubdomains.value.every(s => editing.value._draft.subdomains.includes(Number(s.id)));
+  return allSubdomains.value.filter(s => s.slug.toLowerCase().includes(q) || (s.name && s.name.toLowerCase().includes(q)));
 });
 
 const allBulkFoldersSelected = computed(() => {
@@ -882,47 +1044,7 @@ function closeFiltersModal() {
   tableSubdomainSearch.value = '';
 }
 
-function openEditModal(p) {
-  editing.value = { ...p, _draft: { ...p._draft } };
-}
 
-function closeEditModal() {
-  editing.value = null;
-  searchFolderQuery.value = '';
-  searchSubdomainQuery.value = '';
-}
-
-function toggleAllFolders() {
-  if (!editing.value) return;
-  const filteredIds = filteredFolders.value.map(f => Number(f.id));
-  if (allFoldersSelected.value) {
-    // Снимаем только отфильтрованные
-    editing.value._draft.folders = editing.value._draft.folders.filter(id => !filteredIds.includes(id));
-  } else {
-    // Добавляем отфильтрованные, не дублируя
-    filteredIds.forEach(id => {
-      if (!editing.value._draft.folders.includes(id)) {
-        editing.value._draft.folders.push(id);
-      }
-    });
-  }
-}
-
-function toggleAllSubdomains() {
-  if (!editing.value) return;
-  const filteredIds = filteredSubdomains.value.map(s => Number(s.id));
-  if (allSubdomainsSelected.value) {
-    // Снимаем только отфильтрованные
-    editing.value._draft.subdomains = editing.value._draft.subdomains.filter(id => !filteredIds.includes(id));
-  } else {
-    // Добавляем отфильтрованные, не дублируя
-    filteredIds.forEach(id => {
-      if (!editing.value._draft.subdomains.includes(id)) {
-        editing.value._draft.subdomains.push(id);
-      }
-    });
-  }
-}
 
 function toggleAllBulkFolders() {
   const filteredIds = filteredFolders.value.map(f => Number(f.id));
@@ -1027,16 +1149,31 @@ function regenerateSlug() {
   }
 }
 
-function openCreateModal() {
+async function openCreateModal() {
   newPage.title = '';
   newPage.slug = '';
   newPage.content = '';
   newPage.visibilityRule = 'all';
   newPage.folders = [];
   newPage.subdomains = [];
+  newPage.seoTitle = '';
+  newPage.seoDescription = '';
   createFolderSearch.value = '';
   createSubdomainSearch.value = '';
   slugWasManuallyChanged.value = false;
+  
+  // Загружаем информацию о SEO-режиме
+  try {
+    const seoData = await api.getSeo();
+    seoInfo.value = {
+      activeSeoPlugin: seoData.activeSeoPlugin || '',
+      seoPlugin: seoData.detectedSeoPlugins?.find(p => p.type === seoData.activeSeoPlugin) || null
+    };
+  } catch (e) {
+    console.warn('Failed to load SEO info:', e);
+    seoInfo.value = { activeSeoPlugin: '', seoPlugin: null };
+  }
+  
   createModalOpen.value = true;
 }
 
@@ -1048,9 +1185,12 @@ function closeCreateModal() {
   newPage.visibilityRule = 'all';
   newPage.folders = [];
   newPage.subdomains = [];
+  newPage.seoTitle = '';
+  newPage.seoDescription = '';
   createFolderSearch.value = '';
   createSubdomainSearch.value = '';
   slugWasManuallyChanged.value = false;
+  seoInfo.value = null;
 }
 
 async function createPage() {
@@ -1088,6 +1228,18 @@ async function createPage() {
       }
     }
     
+    // Сохраняем SEO-метаданные (всегда сохраняем, синхронизация произойдет на бэкенде)
+    if (response.id && (newPage.seoTitle || newPage.seoDescription)) {
+      try {
+        await api.setPageSeo(response.id, {
+          title: newPage.seoTitle || '',
+          description: newPage.seoDescription || ''
+        });
+      } catch (e) {
+        console.warn('Failed to set SEO meta:', e);
+      }
+    }
+    
     showMessage('Страница успешно создана', 'success');
     closeCreateModal();
     await load();
@@ -1098,22 +1250,6 @@ async function createPage() {
   }
 }
 
-async function saveVis(p){
-  const payload = { rule: p._draft.rule, folders: p._draft.folders, subdomains: p._draft.subdomains };
-  const res = await fetch(`${boot.restUrl}mr-ml/v1/visibility/${p.id}`, {
-    method: 'POST',
-    headers: { 'X-WP-Nonce': boot.nonce, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    showMessage(`Ошибка сохранения: ${res.status} ${t}`, 'error');
-    return;
-  }
-  closeEditModal();
-  await load();
-  showMessage('Видимость страницы успешно сохранена', 'success');
-}
 
 async function applyBulk() {
   if (bulk.selectedPageIds.length === 0) {
@@ -1142,4 +1278,216 @@ async function confirmBulk() {
   await load();
   selectedIds.value = [];
 }
+
+// Меню выбора способа редактирования
+function showEditMenu(page, e) {
+  e?.stopPropagation();
+  // Закрываем предыдущее меню, если открыто другое
+  if (editMenuId.value !== page.id) {
+    editMenuId.value = page.id;
+    // Добавляем обработчик для закрытия при клике вне меню
+    // Используем setTimeout, чтобы не закрыть меню сразу же
+    setTimeout(() => {
+      document.addEventListener('click', closeEditMenuOnOutsideClick, true);
+    }, 0);
+  } else {
+    editMenuId.value = null;
+    document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+  }
+}
+
+function closeEditMenuOnOutsideClick(e) {
+  if (!editMenuId.value) {
+    document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+    return;
+  }
+  
+  // Ищем меню и кнопку открытия для текущего ID
+  const menuElement = document.querySelector(`[data-edit-menu-id="${editMenuId.value}"]`);
+  const buttonElement = document.querySelector(`[data-edit-menu-button][data-page-id="${editMenuId.value}"]`);
+  
+  // Проверяем, был ли клик внутри меню или на кнопке
+  const clickedInsideMenu = menuElement && menuElement.contains(e.target);
+  const clickedOnButton = buttonElement && (buttonElement === e.target || buttonElement.contains(e.target));
+  
+  // Если клик был вне меню и не на кнопке, закрываем
+  if (!clickedInsideMenu && !clickedOnButton) {
+    editMenuId.value = null;
+    document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+  }
+}
+
+function editInWp(page) {
+  editMenuId.value = null;
+  document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+  window.open(editUrl(page.id), '_blank');
+}
+
+async function editInOurForm(page) {
+  editMenuId.value = null;
+  document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+  editingPage.value = page;
+  
+  try {
+    // Загружаем данные страницы
+    const pageData = await api.getPage(page.id);
+    editPage.id = pageData.id;
+    editPage.title = pageData.title?.rendered || '';
+    editPage.slug = pageData.slug || '';
+    editPage.content = pageData.content?.rendered || '';
+    
+    // Загружаем видимость
+    const visibility = await api.getVisibility(page.id);
+    editPage.visibilityRule = visibility.rule || 'all';
+    editPage.folders = visibility.folders || [];
+    editPage.subdomains = visibility.subdomains || [];
+    
+    // Загружаем SEO
+    const seoData = await api.getPageSeo(page.id);
+    editPage.seoTitle = seoData.title || '';
+    editPage.seoDescription = seoData.description || '';
+    
+    // Загружаем информацию о SEO-режиме
+    const seoSettings = await api.getSeo();
+    editSeoInfo.value = {
+      activeSeoPlugin: seoSettings.activeSeoPlugin || '',
+      seoPlugin: seoSettings.detectedSeoPlugins?.find(p => p.type === seoSettings.activeSeoPlugin) || null
+    };
+    
+    editFolderSearch.value = '';
+    editSubdomainSearch.value = '';
+    editSlugWasManuallyChanged.value = false;
+    
+    editPageModalOpen.value = true;
+  } catch (e) {
+    showMessage('Ошибка загрузки страницы: ' + String(e.message || e), 'error');
+  }
+}
+
+function closeEditPageModal() {
+  editPageModalOpen.value = false;
+  editingPage.value = null;
+  editPage.id = null;
+  editPage.title = '';
+  editPage.slug = '';
+  editPage.content = '';
+  editPage.visibilityRule = 'all';
+  editPage.folders = [];
+  editPage.subdomains = [];
+  editPage.seoTitle = '';
+  editPage.seoDescription = '';
+  editFolderSearch.value = '';
+  editSubdomainSearch.value = '';
+  editSlugWasManuallyChanged.value = false;
+  editSeoInfo.value = null;
+}
+
+async function updatePage() {
+  if (!editPage.title || updating.value || !editPage.id) return;
+  
+  updating.value = true;
+  try {
+    // Обновляем основные данные страницы
+    await api.updatePage(editPage.id, {
+      title: editPage.title,
+      slug: editPage.slug || undefined,
+      content: editPage.content,
+      status: 'publish'
+    });
+    
+    // Обновляем видимость
+    await api.setVisibility(editPage.id, {
+      rule: editPage.visibilityRule,
+      folders: editPage.folders,
+      subdomains: editPage.subdomains
+    });
+    
+    // Сохраняем SEO-метаданные
+    if (editPage.seoTitle || editPage.seoDescription) {
+      await api.setPageSeo(editPage.id, {
+        title: editPage.seoTitle || '',
+        description: editPage.seoDescription || ''
+      });
+    }
+    
+    showMessage('Страница успешно обновлена', 'success');
+    closeEditPageModal();
+    await load();
+  } catch (e) {
+    showMessage('Ошибка обновления страницы: ' + String(e.message || e), 'error');
+  } finally {
+    updating.value = false;
+  }
+}
+
+function regenerateEditSlug() {
+  if (editPage.title) {
+    editPage.slug = transliterateToSlug(editPage.title);
+    editSlugWasManuallyChanged.value = false;
+  }
+}
+
+const filteredEditFolders = computed(() => {
+  if (!editFolderSearch.value) return allFolders.value;
+  const q = editFolderSearch.value.toLowerCase();
+  return allFolders.value.filter(f => f.slug.toLowerCase().includes(q) || f.nominative?.toLowerCase().includes(q) || f.dative?.toLowerCase().includes(q) || f.genitive?.toLowerCase().includes(q));
+});
+
+const filteredEditSubdomains = computed(() => {
+  if (!editSubdomainSearch.value) return allSubdomains.value;
+  const q = editSubdomainSearch.value.toLowerCase();
+  return allSubdomains.value.filter(s => s.slug.toLowerCase().includes(q) || s.nominative?.toLowerCase().includes(q) || s.dative?.toLowerCase().includes(q) || s.genitive?.toLowerCase().includes(q));
+});
+
+const allEditFoldersSelected = computed(() => {
+  if (filteredEditFolders.value.length === 0) return false;
+  return filteredEditFolders.value.every(f => editPage.folders.includes(Number(f.id)));
+});
+
+const allEditSubdomainsSelected = computed(() => {
+  if (filteredEditSubdomains.value.length === 0) return false;
+  return filteredEditSubdomains.value.every(s => editPage.subdomains.includes(Number(s.id)));
+});
+
+function toggleAllEditFolders() {
+  const filteredIds = filteredEditFolders.value.map(f => Number(f.id));
+  if (allEditFoldersSelected.value) {
+    editPage.folders = editPage.folders.filter(id => !filteredIds.includes(id));
+  } else {
+    const existing = new Set(editPage.folders);
+    filteredIds.forEach(id => existing.add(id));
+    editPage.folders = Array.from(existing);
+  }
+}
+
+function toggleAllEditSubdomains() {
+  const filteredIds = filteredEditSubdomains.value.map(s => Number(s.id));
+  if (allEditSubdomainsSelected.value) {
+    editPage.subdomains = editPage.subdomains.filter(id => !filteredIds.includes(id));
+  } else {
+    const existing = new Set(editPage.subdomains);
+    filteredIds.forEach(id => existing.add(id));
+    editPage.subdomains = Array.from(existing);
+  }
+}
+
+// Watch для автослага редактирования
+watch(() => editPageModalOpen.value, (isOpen) => {
+  if (isOpen && editPage.title) {
+    let stopWatch = null;
+    stopWatch = watch(() => editPage.title, (newTitle, oldTitle) => {
+      if (!editSlugWasManuallyChanged.value) {
+        const newSlug = transliterateToSlug(newTitle);
+        if (!editPage.slug || editPage.slug === transliterateToSlug(oldTitle || '')) {
+          editPage.slug = newSlug;
+        }
+      }
+    });
+    editPage._stopWatch = stopWatch;
+  } else if (!isOpen && editPage._stopWatch) {
+    editPage._stopWatch();
+    editPage._stopWatch = null;
+  }
+});
+
 </script>

@@ -65,6 +65,23 @@ export function createApi(boot) {
         status: payload.status || 'draft'
       })
     }),
+    getPage: (postId) => wpReq(`/multiregional_page/${postId}`),
+    updatePage: (postId, payload) => wpReq(`/multiregional_page/${postId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        title: payload.title,
+        slug: payload.slug,
+        content: payload.content,
+        status: payload.status
+      })
+    }),
+    
+    // Page SEO
+    getPageSeo: (postId) => req(`/page-seo/${postId}`),
+    setPageSeo: (postId, payload) => req(`/page-seo/${postId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   };
 }
 

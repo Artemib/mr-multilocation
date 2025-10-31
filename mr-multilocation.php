@@ -177,6 +177,60 @@ function mr_ml_register_cpt(): void {
 add_action( 'init', 'mr_ml_register_cpt' );
 
 /**
+ * Detect active SEO plugins
+ */
+function mr_ml_detect_seo_plugins(): array {
+	if ( ! function_exists( 'is_plugin_active' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	}
+	
+	$plugins = array();
+	
+	// Yoast SEO
+	if ( is_plugin_active( 'wordpress-seo/wp-seo.php' ) || is_plugin_active( 'wordpress-seo-premium/wp-seo-premium.php' ) ) {
+		$plugins[] = array(
+			'name' => 'Yoast SEO',
+			'type' => 'yoast',
+			'meta_title' => '_yoast_wpseo_title',
+			'meta_description' => '_yoast_wpseo_metadesc',
+			'meta_slug' => '_yoast_wpseo_slug', // Метаполе Yoast для слага (если используется)
+		);
+	}
+	
+	// Rank Math
+	if ( is_plugin_active( 'seo-by-rank-math/rank-math.php' ) ) {
+		$plugins[] = array(
+			'name' => 'Rank Math',
+			'type' => 'rankmath',
+			'meta_title' => 'rank_math_title',
+			'meta_description' => 'rank_math_description',
+		);
+	}
+	
+	// All in One SEO
+	if ( is_plugin_active( 'all-in-one-seo-pack/all_in_one_seo_pack.php' ) || is_plugin_active( 'all-in-one-seo-pack-pro/all_in_one_seo_pack.php' ) ) {
+		$plugins[] = array(
+			'name' => 'All in One SEO',
+			'type' => 'aioseo',
+			'meta_title' => '_aioseo_title',
+			'meta_description' => '_aioseo_description',
+		);
+	}
+	
+	// SEOPress
+	if ( is_plugin_active( 'wp-seopress/seopress.php' ) ) {
+		$plugins[] = array(
+			'name' => 'SEOPress',
+			'type' => 'seopress',
+			'meta_title' => '_seopress_titles_title',
+			'meta_description' => '_seopress_titles_desc',
+		);
+	}
+	
+	return $plugins;
+}
+
+/**
  * Render admin page wrapper; SPA mounts into #mr-ml-app.
  */
 function mr_ml_render_admin_page(): void {
@@ -289,6 +343,9 @@ function mr_ml_register_rest_routes(): void {
 		array(
 			'methods'  => WP_REST_Server::READABLE,
 			'callback' => function() {
+				$detected = mr_ml_detect_seo_plugins();
+				$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+				
 				return rest_ensure_response( array(
 					'enableCanonical' => (bool) get_option( 'mr_ml_enable_canonical', true ),
 					'enableHreflang' => (bool) get_option( 'mr_ml_enable_hreflang', true ),
@@ -296,6 +353,8 @@ function mr_ml_register_rest_routes(): void {
 					'robotsYandexDisallowSubdomains' => (bool) get_option( 'mr_ml_robots_yandex_disallow_subdomains', false ),
 					'robotsTplGoogle' => (string) get_option( 'mr_ml_robots_tpl_google', '' ),
 					'robotsTplYandex' => (string) get_option( 'mr_ml_robots_tpl_yanex', '' ),
+					'detectedSeoPlugins' => $detected,
+					'activeSeoPlugin' => $active_seo,
 				) );
 			},
 			'permission_callback' => function () { return current_user_can( 'manage_options' ); },
@@ -310,6 +369,9 @@ function mr_ml_register_rest_routes(): void {
 				update_option( 'mr_ml_robots_yandex_disallow_subdomains', ! empty( $p['robotsYandexDisallowSubdomains'] ), false );
 				update_option( 'mr_ml_robots_tpl_google', isset( $p['robotsTplGoogle'] ) ? wp_kses_post( (string) $p['robotsTplGoogle'] ) : '', false );
 				update_option( 'mr_ml_robots_tpl_yanex', isset( $p['robotsTplYandex'] ) ? wp_kses_post( (string) $p['robotsTplYandex'] ) : '', false );
+				if ( isset( $p['activeSeoPlugin'] ) ) {
+					update_option( 'mr_ml_active_seo_plugin', sanitize_text_field( (string) $p['activeSeoPlugin'] ), false );
+				}
 				return rest_ensure_response( array( 'success' => true ) );
 			},
 			'permission_callback' => function () { return current_user_can( 'manage_options' ); },
@@ -387,6 +449,111 @@ function mr_ml_register_rest_routes(): void {
 					);
 				}
 				return rest_ensure_response( $items );
+			},
+			'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+		),
+	) );
+
+	/**
+	 * Save or get SEO meta for a page (синхронизация с SEO-плагинами)
+	 */
+	register_rest_route( 'mr-ml/v1', '/page-seo/(?P<post_id>\d+)', array(
+		array(
+			'methods'  => WP_REST_Server::READABLE,
+			'callback' => function( WP_REST_Request $req ) {
+				$post_id = (int) $req['post_id'];
+				if ( ! current_user_can( 'edit_post', $post_id ) ) {
+					return new WP_Error( 'mr_ml_forbidden', 'Forbidden', array( 'status' => 403 ) );
+				}
+				
+				$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+				$detected = mr_ml_detect_seo_plugins();
+				
+				$seo_plugin = null;
+				if ( ! empty( $detected ) && ! empty( $active_seo ) ) {
+					foreach ( $detected as $p ) {
+						if ( $p['type'] === $active_seo ) {
+							$seo_plugin = $p;
+							break;
+						}
+					}
+				}
+				
+				// Всегда читаем встроенные поля
+				$builtin_title = get_post_meta( $post_id, '_mr_ml_seo_title', true );
+				$builtin_description = get_post_meta( $post_id, '_mr_ml_seo_description', true );
+				
+				// Если есть синхронизация с SEO-плагином, читаем оттуда (приоритет)
+				if ( $seo_plugin ) {
+					$plugin_title = get_post_meta( $post_id, $seo_plugin['meta_title'], true );
+					$plugin_description = get_post_meta( $post_id, $seo_plugin['meta_description'], true );
+					
+					// Используем данные из SEO-плагина если они есть, иначе встроенные
+					$title = ! empty( $plugin_title ) ? $plugin_title : $builtin_title;
+					$description = ! empty( $plugin_description ) ? $plugin_description : $builtin_description;
+				} else {
+					$title = $builtin_title;
+					$description = $builtin_description;
+				}
+				
+				return rest_ensure_response( array(
+					'activeSeoPlugin' => $active_seo,
+					'seoPlugin' => $seo_plugin,
+					'title' => $title,
+					'description' => $description,
+				) );
+			},
+			'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+		),
+		array(
+			'methods'  => WP_REST_Server::CREATABLE,
+			'callback' => function( WP_REST_Request $req ) {
+				$post_id = (int) $req['post_id'];
+				if ( ! current_user_can( 'edit_post', $post_id ) ) {
+					return new WP_Error( 'mr_ml_forbidden', 'Forbidden', array( 'status' => 403 ) );
+				}
+				
+				$params = $req->get_json_params();
+				$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+				$detected = mr_ml_detect_seo_plugins();
+				
+				$seo_plugin = null;
+				if ( ! empty( $detected ) && ! empty( $active_seo ) ) {
+					foreach ( $detected as $p ) {
+						if ( $p['type'] === $active_seo ) {
+							$seo_plugin = $p;
+							break;
+						}
+					}
+				}
+				
+				// Защита от рекурсии при синхронизации
+				static $syncing = array();
+				if ( ! isset( $syncing[ $post_id ] ) ) {
+					$syncing[ $post_id ] = true;
+					
+					// Всегда сохраняем во встроенные поля
+					if ( isset( $params['title'] ) ) {
+						update_post_meta( $post_id, '_mr_ml_seo_title', sanitize_text_field( (string) $params['title'] ) );
+					}
+					if ( isset( $params['description'] ) ) {
+						update_post_meta( $post_id, '_mr_ml_seo_description', sanitize_textarea_field( (string) $params['description'] ) );
+					}
+					
+					// Если есть синхронизация с SEO-плагином, сохраняем и туда
+					if ( $seo_plugin ) {
+						if ( isset( $params['title'] ) ) {
+							update_post_meta( $post_id, $seo_plugin['meta_title'], sanitize_text_field( (string) $params['title'] ) );
+						}
+						if ( isset( $params['description'] ) ) {
+							update_post_meta( $post_id, $seo_plugin['meta_description'], sanitize_textarea_field( (string) $params['description'] ) );
+						}
+					}
+					
+					unset( $syncing[ $post_id ] );
+				}
+				
+				return rest_ensure_response( array( 'success' => true ) );
 			},
 			'permission_callback' => function () { return current_user_can( 'manage_options' ); },
 		),
@@ -689,6 +856,202 @@ add_filter( 'the_content', 'mr_ml_filter_the_content', 20 );
 /**
  * Метабокс "MR Multilocation: Видимость" для всех public post types
  */
+/**
+ * Синхронизация SEO-метаданных при изменении через SEO-плагины
+ */
+function mr_ml_sync_seo_on_plugin_meta_update( $meta_id, $post_id, $meta_key, $meta_value ) {
+	// Защита от рекурсии
+	static $syncing = array();
+	$key = $post_id . '_' . $meta_key;
+	if ( isset( $syncing[ $key ] ) ) {
+		return;
+	}
+	
+	// Проверяем, что это изменение через SEO-плагин (не через наш API)
+	if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+		$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+		if ( strpos( $request_uri, '/mr-ml/v1/page-seo/' ) !== false ) {
+			// Это наш API, синхронизация не нужна
+			return;
+		}
+	}
+	
+	// Только для нашего CPT
+	$post = get_post( $post_id );
+	if ( ! $post || $post->post_type !== 'multiregional_page' ) {
+		return;
+	}
+	
+	$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+	if ( empty( $active_seo ) ) {
+		return;
+	}
+	
+	$detected = mr_ml_detect_seo_plugins();
+	$seo_plugin = null;
+	foreach ( $detected as $p ) {
+		if ( $p['type'] === $active_seo ) {
+			$seo_plugin = $p;
+			break;
+		}
+	}
+	
+	if ( ! $seo_plugin ) {
+		return;
+	}
+	
+	// Проверяем, что это изменение SEO-полей плагина
+	if ( $meta_key === $seo_plugin['meta_title'] || $meta_key === $seo_plugin['meta_description'] ) {
+		$syncing[ $key ] = true;
+		
+		// Синхронизируем во встроенные поля
+		if ( $meta_key === $seo_plugin['meta_title'] ) {
+			update_post_meta( $post_id, '_mr_ml_seo_title', sanitize_text_field( (string) $meta_value ) );
+		} elseif ( $meta_key === $seo_plugin['meta_description'] ) {
+			update_post_meta( $post_id, '_mr_ml_seo_description', sanitize_textarea_field( (string) $meta_value ) );
+		}
+		
+		unset( $syncing[ $key ] );
+	}
+}
+add_action( 'updated_post_meta', 'mr_ml_sync_seo_on_plugin_meta_update', 10, 4 );
+add_action( 'added_post_meta', 'mr_ml_sync_seo_on_plugin_meta_update', 10, 4 );
+
+/**
+ * Синхронизация слага с Yoast SEO при изменении через наш API
+ * WordPress REST API автоматически обновляет post_name при изменении slug
+ */
+function mr_ml_sync_slug_after_update( $post_id, $post, $update ) {
+	// Только для нашего CPT и только при обновлении
+	if ( $post->post_type !== 'multiregional_page' || ! $update ) {
+		return;
+	}
+	
+	// Защита от рекурсии
+	static $syncing = array();
+	if ( isset( $syncing[ $post_id ] ) ) {
+		return;
+	}
+	
+	// Проверяем, что это изменение через наш API
+	if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+		$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+		if ( strpos( $request_uri, '/wp/v2/multiregional_page/' ) !== false ) {
+			$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+			
+			// Если активен Yoast SEO, синхронизируем слаг
+			if ( $active_seo === 'yoast' && $post->post_name ) {
+				$syncing[ $post_id ] = true;
+				
+				// Yoast использует post_name напрямую, но может иметь метаполе _yoast_wpseo_slug
+				// Обновим метаполе для согласованности
+				$current_yoast_slug = get_post_meta( $post_id, '_yoast_wpseo_slug', true );
+				if ( $current_yoast_slug !== $post->post_name ) {
+					update_post_meta( $post_id, '_yoast_wpseo_slug', $post->post_name );
+				}
+				
+				unset( $syncing[ $post_id ] );
+			}
+		}
+	}
+}
+add_action( 'wp_insert_post', 'mr_ml_sync_slug_after_update', 20, 3 );
+
+/**
+ * Синхронизация слага из Yoast SEO при изменении метаполя _yoast_wpseo_slug
+ */
+function mr_ml_sync_slug_from_yoast_meta( $meta_id, $post_id, $meta_key, $meta_value ) {
+	// Только для нашего CPT
+	$post = get_post( $post_id );
+	if ( ! $post || $post->post_type !== 'multiregional_page' ) {
+		return;
+	}
+	
+	// Защита от рекурсии
+	static $syncing = array();
+	$key = $post_id . '_' . $meta_key;
+	if ( isset( $syncing[ $key ] ) ) {
+		return;
+	}
+	
+	$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+	
+	// Если активен Yoast SEO и изменено метаполе слага Yoast
+	if ( $active_seo === 'yoast' && $meta_key === '_yoast_wpseo_slug' && $meta_value ) {
+		$syncing[ $key ] = true;
+		
+		// Обновляем post_name в WordPress
+		if ( $meta_value !== $post->post_name ) {
+			wp_update_post( array(
+				'ID' => $post_id,
+				'post_name' => sanitize_title( $meta_value )
+			) );
+		}
+		
+		unset( $syncing[ $key ] );
+	}
+}
+add_action( 'updated_post_meta', 'mr_ml_sync_slug_from_yoast_meta', 10, 4 );
+add_action( 'added_post_meta', 'mr_ml_sync_slug_from_yoast_meta', 10, 4 );
+
+/**
+ * Синхронизация слага при изменении post_name напрямую (через WordPress/Yoast интерфейс)
+ */
+function mr_ml_sync_slug_from_post_name( $post_id, $post_after, $post_before ) {
+	// Только для нашего CPT
+	if ( $post_after->post_type !== 'multiregional_page' ) {
+		return;
+	}
+	
+	// Защита от рекурсии
+	static $syncing = array();
+	if ( isset( $syncing[ $post_id ] ) ) {
+		return;
+	}
+	
+	// Проверяем, что слаг действительно изменился
+	if ( $post_after->post_name === $post_before->post_name ) {
+		return;
+	}
+	
+	// Проверяем, что это не наше изменение (через наш API)
+	if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+		$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+		if ( strpos( $request_uri, '/wp/v2/multiregional_page/' ) !== false ) {
+			// Это наше изменение через REST API, синхронизируем с Yoast метаполем
+			$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+			if ( $active_seo === 'yoast' ) {
+				$syncing[ $post_id ] = true;
+				
+				// Обновляем метаполе Yoast
+				$current_yoast_slug = get_post_meta( $post_id, '_yoast_wpseo_slug', true );
+				if ( $current_yoast_slug !== $post_after->post_name ) {
+					update_post_meta( $post_id, '_yoast_wpseo_slug', $post_after->post_name );
+				}
+				
+				unset( $syncing[ $post_id ] );
+			}
+			return; // Выходим, чтобы не синхронизировать обратно
+		}
+	}
+	
+	// Если изменение через Yoast/WordPress интерфейс - синхронизируем с Yoast метаполем
+	$active_seo = get_option( 'mr_ml_active_seo_plugin', '' );
+	if ( $active_seo === 'yoast' ) {
+		$syncing[ $post_id ] = true;
+		
+		// Обновляем метаполе Yoast для согласованности
+		$current_yoast_slug = get_post_meta( $post_id, '_yoast_wpseo_slug', true );
+		if ( $current_yoast_slug !== $post_after->post_name ) {
+			update_post_meta( $post_id, '_yoast_wpseo_slug', $post_after->post_name );
+		}
+		
+		unset( $syncing[ $post_id ] );
+	}
+}
+add_action( 'post_updated', 'mr_ml_sync_slug_from_post_name', 10, 3 );
+
+
 function mr_ml_visibility_meta_box_add() : void {
     $types = get_post_types( array( 'public' => true ), 'names' );
     foreach ( $types as $pt ) {
