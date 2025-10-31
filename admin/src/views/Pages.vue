@@ -2276,6 +2276,11 @@ async function deleteAllFromTrash() {
     await loadDraft();
     await loadPending();
     await loadFuture();
+    
+    // Если корзина пуста, переключаемся на вкладку "Все страницы"
+    if (trashItems.value.length === 0) {
+      activeTab.value = 'pages';
+    }
   } catch (e) {
     showMessage('Ошибка удаления страниц: ' + String(e.message || e), 'error');
   } finally {
