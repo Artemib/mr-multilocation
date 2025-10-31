@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Scope to WP admin content area for safety */
+#mr-ml-app { @apply mt-4; }
+
+
