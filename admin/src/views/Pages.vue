@@ -2189,6 +2189,8 @@ function confirmDeletePage(page) {
 
 const deletePermanentConfirm = ref(null);
 const deletingPermanentPageId = ref(null);
+const deleteAllConfirmOpen = ref(false);
+const deletingAllFromTrash = ref(false);
 
 function confirmDeleteFromTrash(page) {
   deletePermanentConfirm.value = page;
