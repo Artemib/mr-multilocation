@@ -1,5 +1,50 @@
 <template>
   <div>
+    <!-- Подтверждение удаления страницы -->
+    <div v-if="deleteConfirmPage" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-[9999] bg-white border-2 border-red-300 rounded-lg shadow-xl p-4 min-w-[300px]">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-red-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="font-medium text-slate-900">Подтвердите удаление</h3>
+          <p class="text-sm text-slate-600 mt-1">
+            Вы уверены, что хотите удалить страницу <strong>"{{ deleteConfirmPage.title }}"</strong>?
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <Button variant="secondary" size="sm" @click="cancelDelete">Отмена</Button>
+        <Button variant="primary" size="sm" @click="confirmDelete" class="bg-red-600 hover:bg-red-700 text-white">
+          Удалить
+        </Button>
+      </div>
+    </div>
+
+    <div v-if="deletePermanentConfirm" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-[9999] bg-white border-2 border-red-500 rounded-lg shadow-xl p-4 min-w-[300px]">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-red-200 rounded-full flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-red-700">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="font-medium text-slate-900">Внимание! Удаление навсегда</h3>
+          <p class="text-sm text-slate-600 mt-1">
+            Вы действительно хотите навсегда удалить страницу <strong>"{{ deletePermanentConfirm.title }}"</strong>? Это действие нельзя отменить.
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <Button variant="secondary" size="sm" @click="cancelDeletePermanent">Отмена</Button>
+        <Button variant="primary" size="sm" @click="deleteFromTrashPermanent" class="bg-red-700 hover:bg-red-800 text-white">
+          Удалить навсегда
+        </Button>
+      </div>
+    </div>
+
     <div v-if="bulkConfirmOpen" class="fixed top-12 left-0 right-0 bg-yellow-100 text-yellow-800 p-3 z-50 border-b border-yellow-300 flex items-center justify-between shadow-md">
       <span>Применить настройки к <strong>{{ bulk.selectedPageIds.length }}</strong> выбранным страницам?</span>
       <div class="flex gap-2">
@@ -8,14 +53,72 @@
       </div>
     </div>
     <h3 class="text-lg font-medium mb-2">Страницы (CPT: multiregional_page)</h3>
-    <div class="flex items-center gap-2 mb-4">
+    
+    <!-- Вкладки -->
+    <div class="mb-4 border-b border-slate-200">
+      <nav class="-mb-px flex space-x-8">
+        <button
+          @click="activeTab = 'pages'"
+          :class="activeTab === 'pages' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+          class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+        >
+          Все страницы
+        </button>
+        <button
+          v-if="draftItems.length > 0"
+          @click="activeTab = 'draft'"
+          :class="activeTab === 'draft' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+          class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+        >
+          Черновики
+          <span class="ml-2 bg-slate-200 text-slate-700 rounded-full px-2 py-0.5 text-xs">
+            {{ draftItems.length }}
+          </span>
+        </button>
+        <button
+          v-if="pendingItems.length > 0"
+          @click="activeTab = 'pending'"
+          :class="activeTab === 'pending' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+          class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+        >
+          Ожидают
+          <span class="ml-2 bg-slate-200 text-slate-700 rounded-full px-2 py-0.5 text-xs">
+            {{ pendingItems.length }}
+          </span>
+        </button>
+        <button
+          v-if="futureItems.length > 0"
+          @click="activeTab = 'future'"
+          :class="activeTab === 'future' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+          class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+        >
+          Запланировано
+          <span class="ml-2 bg-slate-200 text-slate-700 rounded-full px-2 py-0.5 text-xs">
+            {{ futureItems.length }}
+          </span>
+        </button>
+        <button
+          v-if="trashItems.length > 0"
+          @click="activeTab = 'trash'"
+          :class="activeTab === 'trash' ? 'border-red-400 text-red-600' : 'border-transparent text-red-400 hover:text-red-600 hover:border-red-300'"
+          class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+        >
+          Корзина
+          <span class="ml-2 bg-red-100 text-red-700 rounded-full px-2 py-0.5 text-xs">
+            {{ trashItems.length }}
+          </span>
+        </button>
+      </nav>
+    </div>
+
+    <div v-if="activeTab === 'pages'" class="mb-4 flex items-center gap-2">
       <Button variant="primary" @click="openCreateModal">Добавить</Button>
       <a :href="newUrl" class="text-slate-600 underline" target="_blank">Добавить в WP</a>
       <a :href="listUrl" class="text-slate-600 underline" target="_blank">Открыть список в WP</a>
     </div>
 
     <!-- Поиск и фильтры -->
-    <div class="mb-4 flex items-end gap-2">
+    <div v-if="activeTab === 'pages'" class="mb-4 flex items-end gap-2">
       <div class="flex-1">
         <Input 
           v-model="tableSearchQuery" 
@@ -33,7 +136,7 @@
         </Button>
       </div>
     </div>
-    <div class="mb-4 text-xs text-slate-500">
+    <div v-if="activeTab === 'pages'" class="mb-4 text-xs text-slate-500">
       Найдено: {{ tableFilteredItems.length }} из {{ items.length }}
     </div>
 
@@ -120,7 +223,7 @@
     </Modal>
 
     <div v-if="error" class="text-red-700 mb-2">{{ error }}</div>
-    <div class="overflow-auto">
+    <div v-if="activeTab === 'pages'" class="overflow-auto">
       <table class="min-w-full text-sm">
         <thead>
           <tr class="text-left border-b">
@@ -193,7 +296,36 @@
               <div v-else class="text-slate-500">—</div>
             </td>
             <td class="py-2 pr-4">
-              <Button variant="secondary" size="sm" @click="editInOurForm(p)">Настроить</Button>
+              <div class="flex items-center gap-2">
+                <a 
+                  :href="editUrl(p.id)"
+                  target="_blank"
+                  class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                  title="Редактировать в WordPress"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                  </svg>
+                </a>
+                <button 
+                  @click="editInOurForm(p)"
+                  class="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded transition-colors"
+                  title="Редактировать в форме плагина"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                  </svg>
+                </button>
+                <button 
+                  @click="showDeleteConfirm(p)"
+                  class="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                  title="Удалить страницу"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                  </svg>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -202,6 +334,7 @@
 
     <!-- Показать ещё -->
     <ShowMorePagination
+      v-if="activeTab === 'pages'"
       :displayed="displayedItems.length"
       :total="tableFilteredItems.length"
       :has-more="hasMoreItems"
@@ -209,6 +342,214 @@
       @show-more="currentPage = Math.min(totalPages, currentPage + 1)"
       @update:items-per-page="itemsPerPage = $event"
     />
+
+    <!-- Корзина -->
+    <div v-if="activeTab === 'trash'">
+      <div v-if="trashLoading" class="text-slate-500 py-4">Загрузка...</div>
+      <div v-else-if="trashItems.length === 0" class="text-slate-500 py-4">Корзина пуста</div>
+      <div v-else>
+        <div class="mb-4 flex justify-end">
+          <Button 
+            variant="primary" 
+            @click="confirmDeleteAllFromTrash"
+            class="bg-red-600 hover:bg-red-700 text-white"
+            :disabled="deletingAllFromTrash"
+          >
+            {{ deletingAllFromTrash ? 'Удаление...' : 'Удалить все' }}
+          </Button>
+        </div>
+        <div class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-left border-b">
+              <th class="py-2 pr-4">Название</th>
+              <th class="py-2 pr-4">Слаг</th>
+              <th class="py-2 pr-4">Дата удаления</th>
+              <th class="py-2 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in trashItems" :key="p.id" class="border-b align-top">
+              <td class="py-2 pr-4">
+                <span class="text-slate-900">{{ p.title }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500">{{ p.slug }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500 text-xs">{{ p.date }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <div class="flex items-center gap-2">
+                  <button @click="restorePage(p)" :disabled="restoringPageId === p.id" class="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Восстановить">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    <span>{{ restoringPageId === p.id ? 'Восстановление...' : 'Восстановить' }}</span>
+                  </button>
+                  <button @click="confirmDeleteFromTrash(p)" class="text-red-600 hover:text-red-800" title="Удалить навсегда">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Черновики -->
+    <div v-if="activeTab === 'draft'">
+      <div v-if="draftLoading" class="text-slate-500 py-4">Загрузка...</div>
+      <div v-else-if="draftItems.length === 0" class="text-slate-500 py-4">Нет черновиков</div>
+      <div v-else class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-left border-b">
+              <th class="py-2 pr-4">Название</th>
+              <th class="py-2 pr-4">Слаг</th>
+              <th class="py-2 pr-4">Дата изменения</th>
+              <th class="py-2 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in draftItems" :key="p.id" class="border-b align-top">
+              <td class="py-2 pr-4">
+                <a :href="editUrl(p.id)" target="_blank" class="text-blue-600 hover:underline">{{ p.title }}</a>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500">{{ p.slug }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500 text-xs">{{ p.date }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <div class="flex gap-2 items-center">
+                  <button @click="editInOurFormById(p.id)" class="text-blue-600 hover:text-blue-800" title="Редактировать">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button @click="changeStatus(p.id, 'publish')" class="text-green-600 hover:text-green-800" title="Опубликовать">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button @click="confirmDeletePage(p)" class="text-red-600 hover:text-red-800" title="Удалить в корзину">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Ожидают проверки -->
+    <div v-if="activeTab === 'pending'">
+      <div v-if="pendingLoading" class="text-slate-500 py-4">Загрузка...</div>
+      <div v-else-if="pendingItems.length === 0" class="text-slate-500 py-4">Нет страниц, ожидающих проверки</div>
+      <div v-else class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-left border-b">
+              <th class="py-2 pr-4">Название</th>
+              <th class="py-2 pr-4">Слаг</th>
+              <th class="py-2 pr-4">Дата изменения</th>
+              <th class="py-2 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in pendingItems" :key="p.id" class="border-b align-top">
+              <td class="py-2 pr-4">
+                <a :href="editUrl(p.id)" target="_blank" class="text-blue-600 hover:underline">{{ p.title }}</a>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500">{{ p.slug }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500 text-xs">{{ p.date }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <div class="flex gap-2 items-center">
+                  <button @click="editInOurFormById(p.id)" class="text-blue-600 hover:text-blue-800" title="Редактировать">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button @click="changeStatus(p.id, 'publish')" class="text-green-600 hover:text-green-800" title="Опубликовать">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button @click="confirmDeletePage(p)" class="text-red-600 hover:text-red-800" title="Удалить в корзину">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Запланированные -->
+    <div v-if="activeTab === 'future'">
+      <div v-if="futureLoading" class="text-slate-500 py-4">Загрузка...</div>
+      <div v-else-if="futureItems.length === 0" class="text-slate-500 py-4">Нет запланированных страниц</div>
+      <div v-else class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-left border-b">
+              <th class="py-2 pr-4">Название</th>
+              <th class="py-2 pr-4">Слаг</th>
+              <th class="py-2 pr-4">Дата публикации</th>
+              <th class="py-2 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in futureItems" :key="p.id" class="border-b align-top">
+              <td class="py-2 pr-4">
+                <a :href="editUrl(p.id)" target="_blank" class="text-blue-600 hover:underline">{{ p.title }}</a>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500">{{ p.slug }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <span class="text-slate-500 text-xs">{{ p.date }}</span>
+              </td>
+              <td class="py-2 pr-4">
+                <div class="flex gap-2 items-center">
+                  <button @click="editInOurFormById(p.id)" class="text-blue-600 hover:text-blue-800" title="Редактировать">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button @click="changeStatus(p.id, 'publish')" class="text-green-600 hover:text-green-800" title="Опубликовать">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button @click="confirmDeletePage(p)" class="text-red-600 hover:text-red-800" title="Удалить в корзину">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
 
     <!-- Модальное окно массовых настроек -->
@@ -365,6 +706,29 @@
             placeholder="Введите содержимое страницы..."
             class="w-full border rounded px-3 py-2 h-32 resize-none"
           ></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Статус</label>
+          <Select v-model="newPage.status" class="w-full">
+            <option value="publish">Опубликован</option>
+            <option value="draft">Черновик</option>
+            <option value="pending">Ожидает проверки</option>
+            <option value="future">Запланирован</option>
+          </Select>
+        </div>
+
+        <div v-if="newPage.status === 'future'">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Дата и время публикации</label>
+          <input 
+            type="datetime-local" 
+            v-model="newPage.date"
+            class="w-full border rounded px-3 py-2"
+            :min="new Date().toISOString().slice(0, 16)"
+          />
+          <p class="text-xs text-slate-500 mt-1">
+            Выберите дату и время, когда страница должна быть опубликована
+          </p>
         </div>
 
         <!-- SEO метаданные -->
@@ -527,6 +891,29 @@
           ></textarea>
         </div>
 
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Статус</label>
+          <Select v-model="editPage.status" class="w-full">
+            <option value="publish">Опубликован</option>
+            <option value="draft">Черновик</option>
+            <option value="pending">Ожидает проверки</option>
+            <option value="future">Запланирован</option>
+          </Select>
+        </div>
+
+        <div v-if="editPage.status === 'future'">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Дата и время публикации</label>
+          <input 
+            type="datetime-local" 
+            v-model="editPage.date"
+            class="w-full border rounded px-3 py-2"
+            :min="new Date().toISOString().slice(0, 16)"
+          />
+          <p class="text-xs text-slate-500 mt-1">
+            Выберите дату и время, когда страница должна быть опубликована
+          </p>
+        </div>
+
         <!-- SEO метаданные -->
         <div class="border-t pt-4">
           <div class="flex items-center justify-between mb-3">
@@ -649,6 +1036,16 @@ const error = ref('');
 const listUrl = `${boot.adminUrl}edit.php?post_type=multiregional_page`;
 const newUrl = `${boot.adminUrl}post-new.php?post_type=multiregional_page`;
 const editUrl = (id) => `${boot.adminUrl}post.php?post=${id}&action=edit`;
+const activeTab = ref('pages');
+const trashItems = ref([]);
+const trashLoading = ref(false);
+const restoringPageId = ref(null);
+const draftItems = ref([]);
+const draftLoading = ref(false);
+const pendingItems = ref([]);
+const pendingLoading = ref(false);
+const futureItems = ref([]);
+const futureLoading = ref(false);
 const bulkModalOpen = ref(false);
 const searchQuery = ref('');
 const selectedIds = ref([]);
@@ -674,6 +1071,8 @@ const newPage = reactive({
   title: '',
   slug: '',
   content: '',
+  status: 'publish',
+  date: '',
   visibilityRule: 'all',
   folders: [],
   subdomains: [],
@@ -685,11 +1084,15 @@ const editMenuId = ref(null);
 const editPageModalOpen = ref(false);
 const editingPage = ref(null);
 const updating = ref(false);
+const deletingPageId = ref(null);
+const deleteConfirmPage = ref(null);
 const editPage = reactive({
   id: null,
   title: '',
   slug: '',
   content: '',
+  status: 'publish',
+  date: '',
   visibilityRule: 'all',
   folders: [],
   subdomains: [],
@@ -768,10 +1171,26 @@ onMounted(async () => {
   await load();
   await loadFolders();
   await loadSubdomains();
-  window.addEventListener('click', handleClickOutside);
+  // Загружаем все статусы для проверки наличия элементов
+  await loadTrash();
+  await loadDraft();
+  await loadPending();
+  await loadFuture();
 });
+
+watch(activeTab, (newTab) => {
+  if (newTab === 'trash') {
+    loadTrash();
+  } else if (newTab === 'draft') {
+    loadDraft();
+  } else if (newTab === 'pending') {
+    loadPending();
+  } else if (newTab === 'future') {
+    loadFuture();
+  }
+});
+
 onUnmounted(() => {
-  window.removeEventListener('click', handleClickOutside);
   // Убираем обработчик закрытия меню, если он был добавлен
   document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
 });
@@ -939,6 +1358,26 @@ const allCreateSubdomainsSelected = computed(() => {
   return filteredCreateSubdomains.value.every(s => newPage.subdomains.includes(Number(s.id)));
 });
 
+async function loadFolders() {
+  try {
+    const folders = await api.getFolders();
+    allFolders.value = folders || [];
+  } catch (e) {
+    console.error('Failed to load folders:', e);
+    allFolders.value = [];
+  }
+}
+
+async function loadSubdomains() {
+  try {
+    const subdomains = await api.getSubdomains();
+    allSubdomains.value = subdomains || [];
+  } catch (e) {
+    console.error('Failed to load subdomains:', e);
+    allSubdomains.value = [];
+  }
+}
+
 async function load() {
   try {
     const res = await fetch(`${boot.restUrl}mr-ml/v1/pages`, { headers: { 'X-WP-Nonce': boot.nonce } });
@@ -954,12 +1393,120 @@ async function load() {
       };
     });
     items.value = rows;
-    if (rows.length > 0) {
+    // Загружаем папки и поддомены из данных страниц, если они есть
+    if (rows.length > 0 && (!allFolders.value.length || !allSubdomains.value.length)) {
       allFolders.value = rows[0].folders || [];
       allSubdomains.value = rows[0].subdomains || [];
     }
   } catch (e) {
     error.value = String(e.message || e);
+  }
+}
+
+async function loadTrash() {
+  trashLoading.value = true;
+  try {
+    const res = await fetch(`${boot.restUrl}wp/v2/multiregional_page?status=trash&per_page=100`, { 
+      headers: { 'X-WP-Nonce': boot.nonce } 
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    trashItems.value = rows.map(p => ({
+      id: p.id,
+      title: p.title?.rendered || p.title?.raw || '',
+      slug: p.slug || '',
+      date: p.modified ? new Date(p.modified).toLocaleDateString('ru-RU') : ''
+    }));
+  } catch (e) {
+    error.value = 'Ошибка загрузки корзины: ' + String(e.message || e);
+    trashItems.value = [];
+  } finally {
+    trashLoading.value = false;
+  }
+}
+
+async function loadDraft() {
+  draftLoading.value = true;
+  try {
+    const res = await fetch(`${boot.restUrl}wp/v2/multiregional_page?status=draft&per_page=100`, { 
+      headers: { 'X-WP-Nonce': boot.nonce } 
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    draftItems.value = rows.map(p => ({
+      id: p.id,
+      title: p.title?.rendered || p.title?.raw || '',
+      slug: p.slug || '',
+      date: p.modified ? new Date(p.modified).toLocaleDateString('ru-RU') : ''
+    }));
+  } catch (e) {
+    console.error('Ошибка загрузки черновиков:', e);
+    draftItems.value = [];
+  } finally {
+    draftLoading.value = false;
+  }
+}
+
+async function loadPending() {
+  pendingLoading.value = true;
+  try {
+    const res = await fetch(`${boot.restUrl}wp/v2/multiregional_page?status=pending&per_page=100`, { 
+      headers: { 'X-WP-Nonce': boot.nonce } 
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    pendingItems.value = rows.map(p => ({
+      id: p.id,
+      title: p.title?.rendered || p.title?.raw || '',
+      slug: p.slug || '',
+      date: p.modified ? new Date(p.modified).toLocaleDateString('ru-RU') : ''
+    }));
+  } catch (e) {
+    console.error('Ошибка загрузки ожидающих:', e);
+    pendingItems.value = [];
+  } finally {
+    pendingLoading.value = false;
+  }
+}
+
+async function loadFuture() {
+  futureLoading.value = true;
+  try {
+    const res = await fetch(`${boot.restUrl}wp/v2/multiregional_page?status=future&per_page=100`, { 
+      headers: { 'X-WP-Nonce': boot.nonce } 
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    futureItems.value = rows.map(p => ({
+      id: p.id,
+      title: p.title?.rendered || p.title?.raw || '',
+      slug: p.slug || '',
+      date: p.modified ? new Date(p.modified).toLocaleDateString('ru-RU') : ''
+    }));
+  } catch (e) {
+    console.error('Ошибка загрузки запланированных:', e);
+    futureItems.value = [];
+  } finally {
+    futureLoading.value = false;
+  }
+}
+
+async function restorePage(page) {
+  if (restoringPageId.value) return;
+  restoringPageId.value = page.id;
+  try {
+    await api.restorePage(page.id);
+    showMessage(`Страница "${page.title}" восстановлена`, 'success');
+    await load();
+    // Обновляем все списки статусов после восстановления
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка восстановления страницы: ' + String(e.message || e), 'error');
+  } finally {
+    restoringPageId.value = null;
   }
 }
 
@@ -1153,6 +1700,7 @@ async function openCreateModal() {
   newPage.title = '';
   newPage.slug = '';
   newPage.content = '';
+  newPage.status = 'publish';
   newPage.visibilityRule = 'all';
   newPage.folders = [];
   newPage.subdomains = [];
@@ -1182,6 +1730,8 @@ function closeCreateModal() {
   newPage.title = '';
   newPage.slug = '';
   newPage.content = '';
+  newPage.status = 'publish';
+  newPage.date = '';
   newPage.visibilityRule = 'all';
   newPage.folders = [];
   newPage.subdomains = [];
@@ -1208,12 +1758,21 @@ async function createPage() {
   
   creating.value = true;
   try {
-    const response = await api.createPage({
+    const payload = {
       title: newPage.title,
       slug: newPage.slug || undefined,
       content: newPage.content,
-      status: 'publish' // Всегда публикуем страницу
-    });
+      status: newPage.status || 'publish'
+    };
+    
+    // Если статус 'future' и указана дата, добавляем дату публикации
+    if (payload.status === 'future' && newPage.date) {
+      // Преобразуем datetime-local в ISO формат для WordPress
+      const date = new Date(newPage.date);
+      payload.date = date.toISOString();
+    }
+    
+    const response = await api.createPage(payload);
     
     // Устанавливаем видимость, если она была задана
     if (response.id && newPage.visibilityRule !== 'all') {
@@ -1243,6 +1802,11 @@ async function createPage() {
     showMessage('Страница успешно создана', 'success');
     closeCreateModal();
     await load();
+    // Обновляем все списки статусов после создания страницы
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
   } catch (e) {
     showMessage('Ошибка создания страницы: ' + String(e.message || e), 'error');
   } finally {
@@ -1323,6 +1887,19 @@ function editInWp(page) {
   window.open(editUrl(page.id), '_blank');
 }
 
+async function editInOurFormById(pageId) {
+  try {
+    const pageData = await api.getPage(pageId);
+    editInOurForm({
+      id: pageData.id,
+      title: pageData.title?.rendered || pageData.title?.raw || '',
+      slug: pageData.slug || ''
+    });
+  } catch (e) {
+    showMessage('Ошибка загрузки страницы: ' + String(e.message || e), 'error');
+  }
+}
+
 async function editInOurForm(page) {
   editMenuId.value = null;
   document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
@@ -1335,6 +1912,21 @@ async function editInOurForm(page) {
     editPage.title = pageData.title?.rendered || '';
     editPage.slug = pageData.slug || '';
     editPage.content = pageData.content?.rendered || '';
+    editPage.status = pageData.status || 'publish';
+    
+    // Загружаем дату публикации (для статуса future)
+    if (pageData.status === 'future' && pageData.date) {
+      // Преобразуем ISO дату в формат datetime-local (YYYY-MM-DDTHH:mm)
+      const date = new Date(pageData.date);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      editPage.date = `${year}-${month}-${day}T${hours}:${minutes}`;
+    } else {
+      editPage.date = '';
+    }
     
     // Загружаем видимость
     const visibility = await api.getVisibility(page.id);
@@ -1371,6 +1963,8 @@ function closeEditPageModal() {
   editPage.title = '';
   editPage.slug = '';
   editPage.content = '';
+  editPage.status = 'publish';
+  editPage.date = '';
   editPage.visibilityRule = 'all';
   editPage.folders = [];
   editPage.subdomains = [];
@@ -1388,12 +1982,21 @@ async function updatePage() {
   updating.value = true;
   try {
     // Обновляем основные данные страницы
-    await api.updatePage(editPage.id, {
+    const payload = {
       title: editPage.title,
       slug: editPage.slug || undefined,
       content: editPage.content,
-      status: 'publish'
-    });
+      status: editPage.status || 'publish'
+    };
+    
+    // Если статус 'future' и указана дата, добавляем дату публикации
+    if (payload.status === 'future' && editPage.date) {
+      // Преобразуем datetime-local в ISO формат для WordPress
+      const date = new Date(editPage.date);
+      payload.date = date.toISOString();
+    }
+    
+    await api.updatePage(editPage.id, payload);
     
     // Обновляем видимость
     await api.setVisibility(editPage.id, {
@@ -1413,6 +2016,11 @@ async function updatePage() {
     showMessage('Страница успешно обновлена', 'success');
     closeEditPageModal();
     await load();
+    // Обновляем все списки статусов после изменения статуса
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
   } catch (e) {
     showMessage('Ошибка обновления страницы: ' + String(e.message || e), 'error');
   } finally {
@@ -1487,6 +2095,173 @@ watch(() => editPageModalOpen.value, (isOpen) => {
   } else if (!isOpen && editPage._stopWatch) {
     editPage._stopWatch();
     editPage._stopWatch = null;
+  }
+});
+
+let deleteEscHandler = null;
+
+function showDeleteConfirm(page) {
+  deleteConfirmPage.value = page;
+  deletingPageId.value = page.id;
+  
+  // Добавляем обработчик ESC
+  if (!deleteEscHandler) {
+    deleteEscHandler = (e) => {
+      if (e.key === 'Escape' && deleteConfirmPage.value) {
+        cancelDelete();
+      }
+    };
+    document.addEventListener('keydown', deleteEscHandler);
+  }
+}
+
+function cancelDelete() {
+  deleteConfirmPage.value = null;
+  deletingPageId.value = null;
+  
+  // Удаляем обработчик ESC
+  if (deleteEscHandler) {
+    document.removeEventListener('keydown', deleteEscHandler);
+    deleteEscHandler = null;
+  }
+}
+
+async function confirmDelete() {
+  if (!deletingPageId.value || !deleteConfirmPage.value) return;
+  
+  const pageTitle = deleteConfirmPage.value.title;
+  const pageId = deletingPageId.value;
+  
+  try {
+    await api.deletePage(pageId);
+    showMessage(`Страница "${pageTitle}" отправлена в корзину`, 'success');
+    cancelDelete();
+    await load();
+    // Обновляем список корзины после удаления
+    await loadTrash();
+    // Обновляем остальные списки статусов
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка удаления страницы: ' + String(e.message || e), 'error');
+    cancelDelete();
+  }
+}
+
+function confirmDeletePage(page) {
+  deleteConfirmPage.value = page;
+  deletingPageId.value = page.id;
+  
+  // Добавляем обработчик ESC
+  if (!deleteEscHandler) {
+    deleteEscHandler = (e) => {
+      if (e.key === 'Escape' && deleteConfirmPage.value) {
+        cancelDelete();
+      }
+    };
+    document.addEventListener('keydown', deleteEscHandler);
+  }
+}
+
+const deletePermanentConfirm = ref(null);
+const deletingPermanentPageId = ref(null);
+
+function confirmDeleteFromTrash(page) {
+  deletePermanentConfirm.value = page;
+  deletingPermanentPageId.value = page.id;
+}
+
+function cancelDeletePermanent() {
+  deletePermanentConfirm.value = null;
+  deletingPermanentPageId.value = null;
+}
+
+async function deleteFromTrashPermanent() {
+  if (!deletingPermanentPageId.value || !deletePermanentConfirm.value) return;
+  
+  const pageTitle = deletePermanentConfirm.value.title;
+  const pageId = deletingPermanentPageId.value;
+  
+  try {
+    await api.deletePage(pageId, true); // force=true для удаления навсегда
+    showMessage(`Страница "${pageTitle}" удалена навсегда`, 'success');
+    cancelDeletePermanent();
+    await load();
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка удаления страницы: ' + String(e.message || e), 'error');
+    cancelDeletePermanent();
+  }
+}
+
+async function changeStatus(pageId, newStatus) {
+  try {
+    await api.updatePage(pageId, { status: newStatus });
+    showMessage('Статус страницы изменен', 'success');
+    await load();
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка изменения статуса: ' + String(e.message || e), 'error');
+  }
+}
+
+function confirmDeleteAllFromTrash() {
+  if (trashItems.value.length === 0) return;
+  deleteAllConfirmOpen.value = true;
+}
+
+function cancelDeleteAll() {
+  deleteAllConfirmOpen.value = false;
+}
+
+async function deleteAllFromTrash() {
+  if (trashItems.value.length === 0 || deletingAllFromTrash.value) return;
+  
+  deletingAllFromTrash.value = true;
+  let successCount = 0;
+  let errorCount = 0;
+  
+  try {
+    for (const page of trashItems.value) {
+      try {
+        await api.deletePage(page.id, true); // force=true для удаления навсегда
+        successCount++;
+      } catch (e) {
+        errorCount++;
+        console.error(`Ошибка удаления страницы ${page.id}:`, e);
+      }
+    }
+    
+    if (successCount > 0) {
+      showMessage(`Удалено страниц: ${successCount}${errorCount > 0 ? `, ошибок: ${errorCount}` : ''}`, successCount > 0 ? 'success' : 'error');
+    } else {
+      showMessage('Ошибка удаления страниц', 'error');
+    }
+    
+    cancelDeleteAll();
+    await load();
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка удаления страниц: ' + String(e.message || e), 'error');
+  } finally {
+    deletingAllFromTrash.value = false;
+  }
+}
+
+// Очистка обработчика при размонтировании компонента
+onUnmounted(() => {
+  if (deleteEscHandler) {
+    document.removeEventListener('keydown', deleteEscHandler);
   }
 });
 

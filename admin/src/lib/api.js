@@ -62,7 +62,8 @@ export function createApi(boot) {
         title: payload.title,
         slug: payload.slug,
         content: payload.content,
-        status: payload.status || 'draft'
+        status: payload.status || 'draft',
+        date: payload.date || undefined
       })
     }),
     getPage: (postId) => wpReq(`/multiregional_page/${postId}`),
@@ -72,8 +73,16 @@ export function createApi(boot) {
         title: payload.title,
         slug: payload.slug,
         content: payload.content,
-        status: payload.status
+        status: payload.status,
+        date: payload.date || undefined
       })
+    }),
+    deletePage: (postId, force = false) => wpReq(`/multiregional_page/${postId}${force ? '?force=true' : ''}`, {
+      method: 'DELETE'
+    }),
+    restorePage: (postId) => wpReq(`/multiregional_page/${postId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'publish' })
     }),
     
     // Page SEO
