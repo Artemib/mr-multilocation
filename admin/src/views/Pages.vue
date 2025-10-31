@@ -52,6 +52,29 @@
         <Button variant="secondary" size="sm" @click="bulkConfirmOpen = false">Отмена</Button>
       </div>
     </div>
+
+    <div v-if="deleteAllConfirmOpen" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-[9999] bg-white border-2 border-red-500 rounded-lg shadow-xl p-4 min-w-[400px]">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-red-200 rounded-full flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-red-700">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="font-medium text-slate-900">Внимание! Удаление всех страниц</h3>
+          <p class="text-sm text-slate-600 mt-1">
+            Вы действительно хотите навсегда удалить <strong>все {{ trashItems.length }} страниц</strong> из корзины? Это действие нельзя отменить.
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <Button variant="secondary" size="sm" @click="cancelDeleteAll">Отмена</Button>
+        <Button variant="primary" size="sm" @click="deleteAllFromTrash" class="bg-red-700 hover:bg-red-800 text-white">
+          Удалить все навсегда
+        </Button>
+      </div>
+    </div>
+
     <h3 class="text-lg font-medium mb-2">Страницы (CPT: multiregional_page)</h3>
     
     <!-- Вкладки -->
