@@ -3,36 +3,34 @@
     <div v-if="bulkConfirmOpen" class="fixed top-12 left-0 right-0 bg-yellow-100 text-yellow-800 p-3 z-50 border-b border-yellow-300 flex items-center justify-between shadow-md">
       <span>Применить настройки к <strong>{{ bulk.selectedPageIds.length }}</strong> выбранным страницам?</span>
       <div class="flex gap-2">
-        <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm" @click="confirmBulk">Да, применить</button>
-        <button class="bg-slate-400 text-white px-3 py-1 rounded text-sm" @click="bulkConfirmOpen = false">Отмена</button>
+        <Button variant="primary" size="sm" @click="confirmBulk">Да, применить</Button>
+        <Button variant="secondary" size="sm" @click="bulkConfirmOpen = false">Отмена</Button>
       </div>
     </div>
     <h3 class="text-lg font-medium mb-2">Страницы (CPT: multiregional_page)</h3>
     <div class="flex items-center gap-2 mb-4">
-      <a :href="newUrl" class="bg-blue-600 text-white px-3 py-1 rounded" target="_blank">Добавить</a>
+      <Button variant="primary" @click="openCreateModal">Добавить</Button>
+      <a :href="newUrl" class="text-slate-600 underline" target="_blank">Добавить в WP</a>
       <a :href="listUrl" class="text-slate-600 underline" target="_blank">Открыть список в WP</a>
-      <button class="bg-blue-600 text-white px-3 py-1 rounded" @click="openBulkModal">Массовые настройки</button>
     </div>
 
     <!-- Поиск и фильтры -->
-    <div class="mb-4 flex items-center gap-2">
+    <div class="mb-4 flex items-end gap-2">
       <div class="flex-1">
-        <label class="text-sm text-slate-600 mb-1 block">Поиск:</label>
-        <input 
+        <Input 
           v-model="tableSearchQuery" 
-          type="text" 
-          placeholder="Поиск..." 
-          class="w-full border rounded px-2 py-1"
+          placeholder="Поиск..."
+          class="w-full"
         />
       </div>
-      <div>
-        <label class="text-sm text-slate-600 mb-1 block">&nbsp;</label>
-        <button class="bg-blue-600 text-white px-4 py-1 rounded" @click="filtersModalOpen = true">
+      <div class="flex gap-2">
+        <Button variant="secondary" @click="openBulkModal">Массовые настройки</Button>
+        <Button @click="filtersModalOpen = true">
           Фильтры
           <span v-if="tableFilterFolders.length > 0 || tableFilterSubdomains.length > 0" class="ml-1 text-xs">
             ({{ tableFilterFolders.length + tableFilterSubdomains.length }})
           </span>
-        </button>
+        </Button>
       </div>
     </div>
     <div class="mb-4 text-xs text-slate-500">
@@ -40,31 +38,32 @@
     </div>
 
     <!-- Попап фильтров -->
-    <div v-if="filtersModalOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeFiltersModal">
-      <div class="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">Фильтры</h3>
-          <div class="flex items-center gap-3">
-            <button class="text-slate-600 underline text-sm" @click="resetFilters">Сбросить фильтры</button>
-            <button class="text-slate-500" @click="closeFiltersModal">✕</button>
-          </div>
-        </div>
+    <Modal 
+      v-model="filtersModalOpen"
+      title="Фильтры"
+      size="lg"
+    >
+      <template #header-actions>
+        <Button variant="ghost" size="sm" @click="resetFilters">Сбросить фильтры</Button>
+      </template>
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div>
             <div class="flex items-center justify-between mb-2">
               <div class="text-slate-600 font-medium">Папки</div>
-              <button 
-                @click="toggleAllTableFolders" 
-                class="text-xs text-blue-600 underline"
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="toggleAllTableFolders"
+                class="text-xs"
               >
                 {{ allTableFoldersSelected ? 'Снять все' : 'Выбрать все' }}
-              </button>
+              </Button>
             </div>
-            <input 
+            <Input 
               v-model="tableFolderSearch" 
-              type="text" 
               placeholder="Поиск папок..." 
-              class="w-full border rounded px-2 py-1 mb-2 text-sm"
+              size="sm"
+              class="w-full mb-2"
             />
             <div class="text-xs text-slate-500 mb-1">
               Показано: {{ filteredTableFolders.length }} из {{ allFolders.length }}
@@ -84,18 +83,20 @@
           <div>
             <div class="flex items-center justify-between mb-2">
               <div class="text-slate-600 font-medium">Поддомены</div>
-              <button 
-                @click="toggleAllTableSubdomains" 
-                class="text-xs text-blue-600 underline"
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="toggleAllTableSubdomains"
+                class="text-xs"
               >
                 {{ allTableSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
-              </button>
+              </Button>
             </div>
-            <input 
+            <Input 
               v-model="tableSubdomainSearch" 
-              type="text" 
               placeholder="Поиск поддоменов..." 
-              class="w-full border rounded px-2 py-1 mb-2 text-sm"
+              size="sm"
+              class="w-full mb-2"
             />
             <div class="text-xs text-slate-500 mb-1">
               Показано: {{ filteredTableSubdomains.length }} из {{ allSubdomains.length }}
@@ -114,10 +115,9 @@
           </div>
         </div>
         <div class="flex gap-2 justify-end">
-          <button class="bg-slate-400 text-white px-4 py-2 rounded" @click="closeFiltersModal">Закрыть</button>
+          <Button variant="secondary" @click="closeFiltersModal">Закрыть</Button>
         </div>
-      </div>
-    </div>
+    </Modal>
 
     <div v-if="error" class="text-red-700 mb-2">{{ error }}</div>
     <div class="overflow-auto">
@@ -160,7 +160,7 @@
               <div v-else class="text-slate-500">—</div>
             </td>
             <td class="py-2 pr-4">
-              <button class="bg-slate-600 text-white px-2 py-1 rounded text-xs" @click="openEditModal(p)">Настроить</button>
+              <Button variant="secondary" size="sm" @click="openEditModal(p)">Настроить</Button>
             </td>
           </tr>
         </tbody>
@@ -168,58 +168,47 @@
     </div>
 
     <!-- Показать ещё -->
-    <div class="mt-4 flex items-center justify-between">
-      <div class="text-sm text-slate-600">
-        Показано: {{ displayedItems.length }} из {{ tableFilteredItems.length }}
-      </div>
-      <div class="flex flex-col items-center gap-2">
-        <button 
-          v-if="hasMoreItems"
-          class="px-4 py-2 border rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700" 
-          :disabled="!hasMoreItems" 
-          @click="currentPage = Math.min(totalPages, currentPage + 1)"
-        >
-          Показать ещё
-        </button>
-      </div>
-      <div class="text-sm text-slate-600">
-        Показывать по: 
-        <select v-model.number="itemsPerPage" class="border rounded px-2 py-1">
-          <option :value="10">10</option>
-          <option :value="25">25</option>
-          <option :value="50">50</option>
-        </select>
-      </div>
-    </div>
+    <ShowMorePagination
+      :displayed="displayedItems.length"
+      :total="tableFilteredItems.length"
+      :has-more="hasMoreItems"
+      :items-per-page="itemsPerPage"
+      @show-more="currentPage = Math.min(totalPages, currentPage + 1)"
+      @update:items-per-page="itemsPerPage = $event"
+    />
 
     <!-- Модальное окно редактирования -->
-    <div v-if="editing" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeEditModal">
-      <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
-        <h3 class="text-lg font-semibold mb-4">Настройка видимости: {{ editing.title }}</h3>
+    <Modal 
+      v-model="editingModalOpen"
+      :title="`Настройка видимости: ${editing?.title || ''}`"
+      size="lg"
+    >
         <div class="mb-4">
           <label class="text-slate-600 mr-2">Правило:</label>
-          <select v-model="editing._draft.rule" class="border rounded px-2 py-1">
+          <Select v-model="editing._draft.rule">
             <option value="all">Показывать везде</option>
             <option value="allow">Только выбранные</option>
             <option value="deny">Скрывать выбранные</option>
-          </select>
+          </Select>
         </div>
         <div v-if="editing._draft.rule !== 'all'" class="grid grid-cols-2 gap-4 mb-4">
           <div>
             <div class="flex items-center justify-between mb-2">
               <div class="text-slate-600">Папки</div>
-              <button 
-                @click="toggleAllFolders" 
-                class="text-xs text-blue-600 underline"
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="toggleAllFolders"
+                class="text-xs"
               >
                 {{ allFoldersSelected ? 'Снять все' : 'Выбрать все' }}
-              </button>
+              </Button>
             </div>
-            <input 
+            <Input 
               v-model="searchFolderQuery" 
-              type="text" 
               placeholder="Поиск папок..." 
-              class="w-full border rounded px-2 py-1 mb-2 text-sm"
+              size="sm"
+              class="w-full mb-2"
             />
             <div class="text-xs text-slate-500 mb-1">
               Показано: {{ filteredFolders.length }} из {{ (editing?.folders || allFolders).length }}
@@ -234,18 +223,20 @@
           <div>
             <div class="flex items-center justify-between mb-2">
               <div class="text-slate-600">Поддомены</div>
-              <button 
-                @click="toggleAllSubdomains" 
-                class="text-xs text-blue-600 underline"
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="toggleAllSubdomains"
+                class="text-xs"
               >
                 {{ allSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
-              </button>
+              </Button>
             </div>
-            <input 
+            <Input 
               v-model="searchSubdomainQuery" 
-              type="text" 
               placeholder="Поиск поддоменов..." 
-              class="w-full border rounded px-2 py-1 mb-2 text-sm"
+              size="sm"
+              class="w-full mb-2"
             />
             <div class="text-xs text-slate-500 mb-1">
               Показано: {{ filteredSubdomains.length }} из {{ (editing?.subdomains || allSubdomains).length }}
@@ -259,42 +250,45 @@
           </div>
         </div>
         <div class="flex gap-2 justify-end">
-          <button class="bg-slate-400 text-white px-4 py-2 rounded" @click="closeEditModal">Отмена</button>
-          <button class="bg-blue-600 text-white px-4 py-2 rounded" @click="saveVis(editing)">Сохранить</button>
+          <Button variant="secondary" @click="closeEditModal">Отмена</Button>
+          <Button variant="primary" @click="saveVis(editing)">Сохранить</Button>
         </div>
-      </div>
-    </div>
+    </Modal>
 
     <!-- Модальное окно массовых настроек -->
-    <div v-if="bulkModalOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="closeBulkModal">
-      <div class="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-auto">
-        <h3 class="text-lg font-semibold mb-4">Массовые настройки видимости</h3>
+    <Modal 
+      v-model="bulkModalOpen"
+      title="Массовые настройки видимости"
+      size="lg"
+    >
         
         <div class="mb-4">
           <label class="text-slate-600 mr-2">Правило:</label>
-          <select v-model="bulk.rule" class="border rounded px-2 py-1">
+          <Select v-model="bulk.rule">
             <option value="all">Показывать везде</option>
             <option value="allow">Только выбранные</option>
             <option value="deny">Скрывать выбранные</option>
-          </select>
+          </Select>
         </div>
         
         <div v-if="bulk.rule !== 'all'" class="grid grid-cols-2 gap-4 mb-4">
           <div>
             <div class="flex items-center justify-between mb-2">
               <div class="text-slate-600">Папки</div>
-              <button 
-                @click="toggleAllBulkFolders" 
-                class="text-xs text-blue-600 underline"
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="toggleAllBulkFolders"
+                class="text-xs"
               >
                 {{ allBulkFoldersSelected ? 'Снять все' : 'Выбрать все' }}
-              </button>
+              </Button>
             </div>
-            <input 
+            <Input 
               v-model="searchFolderQuery" 
-              type="text" 
               placeholder="Поиск папок..." 
-              class="w-full border rounded px-2 py-1 mb-2 text-sm"
+              size="sm"
+              class="w-full mb-2"
             />
             <div class="text-xs text-slate-500 mb-1">
               Показано: {{ filteredFolders.length }} из {{ allFolders.length }}
@@ -309,18 +303,20 @@
           <div>
             <div class="flex items-center justify-between mb-2">
               <div class="text-slate-600">Поддомены</div>
-              <button 
-                @click="toggleAllBulkSubdomains" 
-                class="text-xs text-blue-600 underline"
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="toggleAllBulkSubdomains"
+                class="text-xs"
               >
                 {{ allBulkSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
-              </button>
+              </Button>
             </div>
-            <input 
+            <Input 
               v-model="searchSubdomainQuery" 
-              type="text" 
               placeholder="Поиск поддоменов..." 
-              class="w-full border rounded px-2 py-1 mb-2 text-sm"
+              size="sm"
+              class="w-full mb-2"
             />
             <div class="text-xs text-slate-500 mb-1">
               Показано: {{ filteredSubdomains.length }} из {{ allSubdomains.length }}
@@ -337,13 +333,12 @@
         <div class="mb-4 border-t pt-4">
           <div class="flex items-center justify-between mb-2">
             <label class="text-slate-600 font-medium">Страницы для применения ({{ bulk.selectedPageIds.length }} выбрано):</label>
-            <button class="text-sm text-blue-600 underline" @click="toggleSelectAllInBulk">{{ allBulkPagesSelected ? 'Снять все' : 'Выбрать все' }}</button>
+            <Button variant="ghost" size="sm" @click="toggleSelectAllInBulk">{{ allBulkPagesSelected ? 'Снять все' : 'Выбрать все' }}</Button>
           </div>
-          <input 
+          <Input 
             v-model="searchQuery" 
-            type="text" 
             placeholder="Поиск по названию..." 
-            class="w-full border rounded px-2 py-1 mb-2"
+            class="w-full mb-2"
           />
           <div class="text-xs text-slate-500 mb-1">
             Показано: {{ filteredItems.length }} из {{ filteredItemsAll.length }} найдено (всего {{ items.length }})
@@ -358,25 +353,161 @@
         </div>
 
         <div class="flex gap-2 justify-end">
-          <button class="bg-slate-400 text-white px-4 py-2 rounded" @click="closeBulkModal">Отмена</button>
-          <button class="bg-blue-600 text-white px-4 py-2 rounded" @click="applyBulk" :disabled="bulk.selectedPageIds.length === 0">
+          <Button variant="secondary" @click="closeBulkModal">Отмена</Button>
+          <Button variant="primary" @click="applyBulk" :disabled="bulk.selectedPageIds.length === 0">
             Применить к выбранным ({{ bulk.selectedPageIds.length }})
-          </button>
+          </Button>
+        </div>
+    </Modal>
+
+    <!-- Модальное окно создания страницы -->
+    <Modal 
+      v-model="createModalOpen"
+      title="Добавить страницу"
+      size="lg"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Название</label>
+          <Input 
+            v-model="newPage.title" 
+            placeholder="Введите название страницы..."
+            class="w-full"
+          />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Слаг</label>
+          <div class="flex items-center gap-2">
+            <Input 
+              v-model="newPage.slug" 
+              placeholder="page-slug"
+              class="flex-1"
+              @focus="slugWasManuallyChanged = true"
+              @input="slugWasManuallyChanged = true"
+            />
+            <button 
+              @click="regenerateSlug"
+              class="p-2 border rounded hover:bg-slate-100 transition-colors"
+              title="Регенерировать слаг из названия"
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </button>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">
+            Слаг автоматически генерируется из названия при вводе. Используйте кнопку ↻ для перегенерации из текущего названия.
+          </p>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Контент</label>
+          <textarea 
+            v-model="newPage.content" 
+            placeholder="Введите содержимое страницы..."
+            class="w-full border rounded px-3 py-2 h-32 resize-none"
+          ></textarea>
+        </div>
+
+        <div class="border-t pt-4">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-slate-700 mb-2">Видимость страницы</label>
+            <Select v-model="newPage.visibilityRule" class="w-full mb-4">
+              <option value="all">Показывать везде</option>
+              <option value="allow">Только выбранные</option>
+              <option value="deny">Скрывать выбранные</option>
+            </Select>
+          </div>
+          
+          <div v-if="newPage.visibilityRule !== 'all'" class="grid grid-cols-2 gap-4">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-slate-600 font-medium">Папки</div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  @click="toggleAllCreateFolders"
+                  class="text-xs"
+                >
+                  {{ allCreateFoldersSelected ? 'Снять все' : 'Выбрать все' }}
+                </Button>
+              </div>
+              <Input 
+                v-model="createFolderSearch" 
+                placeholder="Поиск папок..." 
+                size="sm"
+                class="w-full mb-2"
+              />
+              <div class="text-xs text-slate-500 mb-1">
+                Показано: {{ filteredCreateFolders.length }} из {{ allFolders.length }}
+              </div>
+              <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
+                <label v-for="f in filteredCreateFolders" :key="f.id" class="block mb-1">
+                  <input type="checkbox" :value="Number(f.id)" v-model="newPage.folders" /> <span v-html="highlightText(f.slug, createFolderSearch)"></span>
+                </label>
+                <div v-if="filteredCreateFolders.length === 0" class="text-slate-500 text-xs">Не найдено</div>
+              </div>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-slate-600 font-medium">Поддомены</div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  @click="toggleAllCreateSubdomains"
+                  class="text-xs"
+                >
+                  {{ allCreateSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
+                </Button>
+              </div>
+              <Input 
+                v-model="createSubdomainSearch" 
+                placeholder="Поиск поддоменов..." 
+                size="sm"
+                class="w-full mb-2"
+              />
+              <div class="text-xs text-slate-500 mb-1">
+                Показано: {{ filteredCreateSubdomains.length }} из {{ allSubdomains.length }}
+              </div>
+              <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
+                <label v-for="s in filteredCreateSubdomains" :key="s.id" class="block mb-1">
+                  <input type="checkbox" :value="Number(s.id)" v-model="newPage.subdomains" /> <span v-html="highlightText(s.slug, createSubdomainSearch)"></span>
+                </label>
+                <div v-if="filteredCreateSubdomains.length === 0" class="text-slate-500 text-xs">Не найдено</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+      
+      <div class="flex gap-2 justify-end mt-6">
+        <Button variant="secondary" @click="closeCreateModal">Отмена</Button>
+        <Button variant="primary" @click="createPage" :disabled="!newPage.title || creating">
+          {{ creating ? 'Создание...' : 'Создать' }}
+        </Button>
+      </div>
+    </Modal>
   </div>
 </template>
 
 <script setup>
 import { inject, ref, onMounted, onUnmounted, reactive, computed, watch } from 'vue';
+import { Button, Input, Select, Modal, ShowMorePagination } from '../components';
+import { highlightText } from '../utils/highlight.js';
 const boot = inject('boot');
+const api = inject('api');
 const items = ref([]);
 const error = ref('');
 const listUrl = `${boot.adminUrl}edit.php?post_type=multiregional_page`;
 const newUrl = `${boot.adminUrl}post-new.php?post_type=multiregional_page`;
 const editUrl = (id) => `${boot.adminUrl}post.php?post=${id}&action=edit`;
 const editing = ref(null);
+const editingModalOpen = computed({
+  get: () => !!editing.value,
+  set: (val) => { if (!val) editing.value = null; }
+});
 const bulkModalOpen = ref(false);
 const searchQuery = ref('');
 const selectedIds = ref([]);
@@ -393,23 +524,83 @@ const filtersModalOpen = ref(false);
 const tableFolderSearch = ref('');
 const tableSubdomainSearch = ref('');
 const bulkConfirmOpen = ref(false);
+const createModalOpen = ref(false);
+const creating = ref(false);
+const createFolderSearch = ref('');
+const createSubdomainSearch = ref('');
+const slugWasManuallyChanged = ref(false);
+const newPage = reactive({
+  title: '',
+  slug: '',
+  content: '',
+  visibilityRule: 'all',
+  folders: [],
+  subdomains: []
+});
+
+// Функция транслитерации для создания слага
+function transliterateToSlug(text) {
+  if (!text) return '';
+  
+  const transliterationMap = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo',
+    'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U',
+    'Ф': 'F', 'Х': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sch',
+    'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+  };
+  
+  let slug = text;
+  
+  // Транслитерация
+  for (const [cyr, lat] of Object.entries(transliterationMap)) {
+    slug = slug.replace(new RegExp(cyr, 'g'), lat);
+  }
+  
+  // Удаление всех символов кроме букв, цифр, пробелов и дефисов (с учетом Unicode)
+  slug = slug.replace(/[^\p{L}\p{N}\s-]/gu, '');
+  
+  // Замена пробелов и множественных дефисов на один дефис
+  slug = slug.replace(/\s+/g, '-').replace(/-+/g, '-');
+  
+  // Приведение к нижнему регистру
+  slug = slug.toLowerCase();
+  
+  // Удаление дефисов в начале и конце
+  slug = slug.replace(/^-+|-+$/g, '');
+  
+  return slug;
+}
+
+// Автоматическое заполнение слага из названия
+watch(() => newPage.title, (newTitle, oldTitle) => {
+  // Заполняем слаг только если:
+  // 1. Слаг еще не был изменен вручную
+  // 2. Название заполнено
+  if (!slugWasManuallyChanged.value && newTitle) {
+    // Вычисляем слаги
+    const newSlug = transliterateToSlug(newTitle);
+    const oldSlug = oldTitle ? transliterateToSlug(oldTitle) : '';
+    
+    // Обновляем слаг если:
+    // - слаг пустой, или
+    // - старый title был пустой (первый ввод), или
+    // - текущий слаг совпадает с транслитерацией старого title (значит он был автоматически сгенерирован)
+    if (!newPage.slug || !oldTitle || newPage.slug === oldSlug) {
+      newPage.slug = newSlug;
+    }
+  }
+});
+
+// Отслеживание ручного изменения слага происходит через события @focus и @input на Input
 
 onMounted(async () => {
   await load();
-  const onKey = (e) => {
-    if (e.key === 'Escape') {
-      if (filtersModalOpen.value) closeFiltersModal();
-      if (bulkModalOpen.value) closeBulkModal();
-      if (bulkConfirmOpen.value) bulkConfirmOpen.value = false;
-    }
-  };
-  window.addEventListener('keydown', onKey);
-  (window).__mr_ml_pages_onKey = onKey;
-});
-
-onUnmounted(() => {
-  const onKey = (window).__mr_ml_pages_onKey;
-  if (onKey) window.removeEventListener('keydown', onKey);
 });
 
 const tableFilteredItems = computed(() => {
@@ -553,6 +744,39 @@ const allTableSubdomainsSelected = computed(() => {
   return filteredTableSubdomains.value.every(s => tableFilterSubdomains.value.includes(Number(s.id)));
 });
 
+// Фильтрация для попапа создания
+const filteredCreateFolders = computed(() => {
+  if (!createFolderSearch.value.trim()) return allFolders.value;
+  const q = createFolderSearch.value.toLowerCase();
+  return allFolders.value.filter(f => 
+    (f.slug || '').toLowerCase().includes(q) ||
+    (f.nominative || '').toLowerCase().includes(q) ||
+    (f.dative || '').toLowerCase().includes(q) ||
+    (f.genitive || '').toLowerCase().includes(q)
+  );
+});
+
+const filteredCreateSubdomains = computed(() => {
+  if (!createSubdomainSearch.value.trim()) return allSubdomains.value;
+  const q = createSubdomainSearch.value.toLowerCase();
+  return allSubdomains.value.filter(s => 
+    (s.slug || '').toLowerCase().includes(q) ||
+    (s.nominative || '').toLowerCase().includes(q) ||
+    (s.dative || '').toLowerCase().includes(q) ||
+    (s.genitive || '').toLowerCase().includes(q)
+  );
+});
+
+const allCreateFoldersSelected = computed(() => {
+  if (newPage.visibilityRule === 'all' || !filteredCreateFolders.value.length) return false;
+  return filteredCreateFolders.value.every(f => newPage.folders.includes(Number(f.id)));
+});
+
+const allCreateSubdomainsSelected = computed(() => {
+  if (newPage.visibilityRule === 'all' || !filteredCreateSubdomains.value.length) return false;
+  return filteredCreateSubdomains.value.every(s => newPage.subdomains.includes(Number(s.id)));
+});
+
 async function load() {
   try {
     const res = await fetch(`${boot.restUrl}mr-ml/v1/pages`, { headers: { 'X-WP-Nonce': boot.nonce } });
@@ -586,16 +810,7 @@ function mapSubIdsToSlugs(ids, subs){
   return (ids||[]).map(id => map.get(Number(id))).filter(Boolean);
 }
 
-// Функция подсветки совпадений
-function highlightText(text, query) {
-  if (!query || !text) {
-    // Экранируем HTML для безопасности
-    return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-  }
-  const safeText = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  return safeText.replace(regex, '<mark class="bg-yellow-300 font-bold">$1</mark>');
-}
+// Используем функцию подсветки из утилит
 
 function toggleSelectAll() {
   if (allSelected.value) {
@@ -771,6 +986,28 @@ function closeBulkModal() {
   bulkConfirmOpen.value = false;
 }
 
+function toggleAllCreateFolders() {
+  const filteredIds = filteredCreateFolders.value.map(f => Number(f.id));
+  if (allCreateFoldersSelected.value) {
+    newPage.folders = newPage.folders.filter(id => !filteredIds.includes(id));
+  } else {
+    const existing = new Set(newPage.folders);
+    filteredIds.forEach(id => existing.add(id));
+    newPage.folders = Array.from(existing);
+  }
+}
+
+function toggleAllCreateSubdomains() {
+  const filteredIds = filteredCreateSubdomains.value.map(s => Number(s.id));
+  if (allCreateSubdomainsSelected.value) {
+    newPage.subdomains = newPage.subdomains.filter(id => !filteredIds.includes(id));
+  } else {
+    const existing = new Set(newPage.subdomains);
+    filteredIds.forEach(id => existing.add(id));
+    newPage.subdomains = Array.from(existing);
+  }
+}
+
 function showMessage(msg, type = 'success') {
   window.dispatchEvent(new CustomEvent('mr-ml-notify', { detail: { message: msg, type } }));
 }
@@ -781,6 +1018,84 @@ function resetFilters() {
   tableFilterSubdomains.value = [];
   tableFolderSearch.value = '';
   tableSubdomainSearch.value = '';
+}
+
+function regenerateSlug() {
+  if (newPage.title) {
+    newPage.slug = transliterateToSlug(newPage.title);
+    slugWasManuallyChanged.value = false; // Разрешаем автообновление после регенерации
+  }
+}
+
+function openCreateModal() {
+  newPage.title = '';
+  newPage.slug = '';
+  newPage.content = '';
+  newPage.visibilityRule = 'all';
+  newPage.folders = [];
+  newPage.subdomains = [];
+  createFolderSearch.value = '';
+  createSubdomainSearch.value = '';
+  slugWasManuallyChanged.value = false;
+  createModalOpen.value = true;
+}
+
+function closeCreateModal() {
+  createModalOpen.value = false;
+  newPage.title = '';
+  newPage.slug = '';
+  newPage.content = '';
+  newPage.visibilityRule = 'all';
+  newPage.folders = [];
+  newPage.subdomains = [];
+  createFolderSearch.value = '';
+  createSubdomainSearch.value = '';
+  slugWasManuallyChanged.value = false;
+}
+
+async function createPage() {
+  if (!newPage.title || creating.value) return;
+  
+  // Проверка уникальности слага перед созданием
+  if (newPage.slug) {
+    const existingSlug = items.value.find(p => p.slug === newPage.slug);
+    if (existingSlug) {
+      showMessage(`Слаг "${newPage.slug}" уже используется на странице "${existingSlug.title}". Используйте другой слаг.`, 'error');
+      creating.value = false;
+      return;
+    }
+  }
+  
+  creating.value = true;
+  try {
+    const response = await api.createPage({
+      title: newPage.title,
+      slug: newPage.slug || undefined,
+      content: newPage.content,
+      status: 'publish' // Всегда публикуем страницу
+    });
+    
+    // Устанавливаем видимость, если она была задана
+    if (response.id && newPage.visibilityRule !== 'all') {
+      try {
+        await api.setVisibility(response.id, {
+          rule: newPage.visibilityRule,
+          folders: newPage.folders,
+          subdomains: newPage.subdomains
+        });
+      } catch (e) {
+        console.warn('Failed to set visibility:', e);
+      }
+    }
+    
+    showMessage('Страница успешно создана', 'success');
+    closeCreateModal();
+    await load();
+  } catch (e) {
+    showMessage('Ошибка создания страницы: ' + String(e.message || e), 'error');
+  } finally {
+    creating.value = false;
+  }
 }
 
 async function saveVis(p){

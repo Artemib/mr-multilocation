@@ -18,13 +18,14 @@
       </div>
     </div>
     <div class="mt-4">
-      <button class="bg-blue-600 text-white px-3 py-1 rounded" @click="save">Сохранить</button>
+      <Button variant="primary" @click="save">Сохранить</Button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { inject, ref, onMounted } from 'vue';
+import { Button } from '../components';
 const api = inject('api');
 
 const enableCanonical = ref(true);

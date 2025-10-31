@@ -1,5 +1,6 @@
 export function createApi(boot) {
   const base = (boot.restUrl || '').replace(/\/$/, '') + '/mr-ml/v1';
+  const wpBase = (boot.restUrl || '').replace(/\/$/, '') + '/wp/v2';
   const headers = {
     'Content-Type': 'application/json',
     'X-WP-Nonce': boot.nonce || '',
@@ -7,6 +8,16 @@ export function createApi(boot) {
 
   async function req(path, opts = {}) {
     const res = await fetch(base + path, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+    }
+    const ct = res.headers.get('content-type') || '';
+    return ct.includes('application/json') ? res.json() : res.text();
+  }
+
+  async function wpReq(path, opts = {}) {
+    const res = await fetch(wpBase + path, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
@@ -43,6 +54,17 @@ export function createApi(boot) {
     // Visibility
     getVisibility: (postId) => req(`/visibility/${postId}`),
     setVisibility: (postId, payload) => req(`/visibility/${postId}`, { method: 'POST', body: JSON.stringify(payload) }),
+
+    // Pages (WordPress REST API)
+    createPage: (payload) => wpReq('/multiregional_page', { 
+      method: 'POST', 
+      body: JSON.stringify({
+        title: payload.title,
+        slug: payload.slug,
+        content: payload.content,
+        status: payload.status || 'draft'
+      })
+    }),
   };
 }
 

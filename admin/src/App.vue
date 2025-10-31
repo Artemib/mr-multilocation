@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { inject, ref, computed, watchEffect, onMounted, onUnmounted } from 'vue';
+import { inject, provide, ref, computed, watchEffect, onMounted, onUnmounted } from 'vue';
 import Targets from './views/Targets.vue';
 import Pages from './views/Pages.vue';
 import Audit from './views/Audit.vue';
@@ -49,6 +49,7 @@ import { createApi } from './lib/api.js';
 
 const boot = inject('boot');
 const api = createApi(boot);
+provide('api', api);
 const mode = ref('hybrid');
 const toasts = ref([]);
 
@@ -121,15 +122,6 @@ function handleNotify(event) {
     toasts.value = toasts.value.filter(t => t.id !== id);
   }, type === 'error' ? 5000 : 3000);
 }
-</script>
-
-<script>
-// Provide api to children via provide/inject using options API bridge
-export default {
-  provide() {
-    return { api: createApi(this.boot || window.MR_ML_BOOT || {}) };
-  },
-};
 </script>
 
 <style scoped>

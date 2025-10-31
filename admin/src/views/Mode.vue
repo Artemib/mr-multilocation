@@ -46,15 +46,16 @@
     </div>
     
     <div>
-      <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium transition-colors" @click="save">
+      <Button variant="primary" @click="save">
         Сохранить режим
-      </button>
+      </Button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { inject, ref, onMounted } from 'vue';
+import { Button } from '../components';
 
 const api = inject('api');
 const mode = ref('hybrid');

@@ -2,34 +2,32 @@
   <div>
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-medium">{{ tabLabel }}</h3>
-      <button class="bg-blue-600 text-white rounded px-3 py-1" @click="showAddForm = !showAddForm">
+      <Button @click="showAddForm = !showAddForm">
         {{ showAddForm ? 'Скрыть форму' : 'Добавить' }}
-      </button>
+      </Button>
     </div>
-    <div v-if="error" class="bg-red-100 text-red-700 p-3 rounded mb-2">{{ error }}</div>
+    <Alert v-if="error" type="error">{{ error }}</Alert>
     
     <div v-if="showAddForm" class="flex gap-2 mb-4 p-3 border rounded bg-slate-50">
-      <select v-model="draft.type" v-if="isHybrid" class="border rounded px-2 py-1">
+      <Select v-if="isHybrid" v-model="draft.type">
         <option value="both">Везде</option>
         <option value="folder">Папка</option>
         <option value="subdomain">Поддомен</option>
-      </select>
-      <input v-model="draft.slug" type="text" placeholder="Слаг" class="border rounded px-2 py-1" />
-      <input v-model="draft.nominative" type="text" placeholder="Именительный (Москва)" class="border rounded px-2 py-1" />
-      <input v-model="draft.dative" type="text" placeholder="Дательный (Москве)" class="border rounded px-2 py-1" />
-      <input v-model="draft.genitive" type="text" placeholder="Родительный (Москвы)" class="border rounded px-2 py-1" />
-      <button class="bg-green-600 text-white rounded px-3 py-1" @click="onCreate">Сохранить</button>
-      <button class="bg-slate-400 text-white rounded px-3 py-1" @click="cancelAdd">Отмена</button>
+      </Select>
+      <Input v-model="draft.slug" placeholder="Слаг" />
+      <Input v-model="draft.nominative" placeholder="Именительный (Москва)" />
+      <Input v-model="draft.dative" placeholder="Дательный (Москве)" />
+      <Input v-model="draft.genitive" placeholder="Родительный (Москвы)" />
+      <Button variant="success" @click="onCreate">Сохранить</Button>
+      <Button variant="secondary" @click="cancelAdd">Отмена</Button>
     </div>
     
     <!-- Поиск -->
     <div class="mb-4">
-      <label class="text-sm text-slate-600 mb-1 block">Поиск:</label>
-      <input 
+      <Input 
         v-model="searchQuery" 
-        type="text" 
-        placeholder="Введите текст для поиска..." 
-        class="w-full border rounded px-3 py-2"
+        placeholder="Поиск..."
+        class="w-full"
       />
     </div>
 
@@ -53,15 +51,15 @@
         <tbody>
           <tr v-for="item in displayedItems" :key="item.id" class="border-b">
             <td v-if="isHybrid" class="py-2 pr-4">
-              <select 
-                :value="getCurrentType(item)" 
-                @change="onTypeChange(item, $event)" 
-                class="border rounded px-2 py-1 text-xs"
+              <Select 
+                :model-value="getCurrentType(item)" 
+                @update:model-value="(val) => onTypeChange(item, val)"
+                size="sm"
               >
                 <option value="both">Везде</option>
                 <option value="folder">Папка</option>
                 <option value="subdomain">Поддомен</option>
-              </select>
+              </Select>
             </td>
             <td class="py-2 pr-4">
               <div v-if="isEditingId !== item.id" 
@@ -130,8 +128,8 @@
                   <div class="bg-yellow-100 text-yellow-900 border border-yellow-300 rounded shadow-md p-3 w-64">
                     <div class="text-sm mb-2">Удалить <strong>{{ item.nominative || item.slug }}</strong>?</div>
                     <div class="flex gap-2 justify-end">
-                      <button class="bg-red-600 text-white px-3 py-1 rounded text-xs" @click="confirmDelete">Удалить</button>
-                      <button class="bg-slate-400 text-white px-3 py-1 rounded text-xs" @click="cancelDelete">Отмена</button>
+                      <Button variant="danger" size="sm" @click="confirmDelete">Удалить</Button>
+                      <Button variant="secondary" size="sm" @click="cancelDelete">Отмена</Button>
                     </div>
                   </div>
                 </div>
@@ -140,35 +138,26 @@
           </tr>
         </tbody>
       </table>
-      <div class="flex items-center justify-between mt-3 text-sm">
-        <div></div>
-        
-        <div class="flex flex-col items-center gap-2">
-          <button 
-            v-if="hasMoreItems"
-            class="px-4 py-2 border rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700" 
-            :disabled="!hasMoreItems" 
-            @click="showMore"
-          >
-            Показать ещё
-          </button>
-        </div>
-        
-        <div class="flex items-center gap-2">
-          <span>Показывать по:</span>
-          <select v-model.number="itemsPerPageTargets" class="border rounded px-2 py-1">
-            <option :value="10">10</option>
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-          </select>
-        </div>
-      </div>
+      <ShowMorePagination
+        :displayed="displayedItems.length"
+        :total="filteredItems.length"
+        :has-more="hasMoreItems"
+        :items-per-page="itemsPerPageTargets"
+        @show-more="showMore"
+        @update:items-per-page="itemsPerPageTargets = $event"
+      >
+        <template #info>
+          Показано: {{ displayedItems.length }} из {{ filteredItems.length }} (всего: {{ allItems.length }})
+        </template>
+      </ShowMorePagination>
     </div>
   </div>
 </template>
 
 <script setup>
 import { inject, reactive, ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { Button, Input, Select, ShowMorePagination, Alert } from '../components';
+import { highlightText } from '../utils/highlight.js';
 const api = inject('api');
 
 const mode = ref('hybrid');
@@ -272,8 +261,7 @@ function getCurrentType(item) {
   return 'subdomain';
 }
 
-async function onTypeChange(item, event) {
-  const newType = event.target.value;
+async function onTypeChange(item, newType) {
   await onUpdateType(item, newType);
 }
 
@@ -604,16 +592,7 @@ function showMore() {
   }
 }
 
-// Функция подсветки совпадений
-function highlightText(text, query) {
-  if (!query || !text) {
-    // Экранируем HTML для безопасности
-    return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-  }
-  const safeText = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  return safeText.replace(regex, '<mark class="bg-yellow-300 font-bold">$1</mark>');
-}
+// Используем функцию подсветки из утилит
 
 // Сбрасываем страницу при изменении поиска или количества на странице
 watch([searchQuery, itemsPerPageTargets], () => {
