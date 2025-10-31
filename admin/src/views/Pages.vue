@@ -356,6 +356,36 @@
       <div v-else class="break-words">{{ tooltip.text }}</div>
     </div>
 
+    <!-- Меню редактирования с fixed позиционированием -->
+    <div 
+      v-if="editMenuId"
+      class="fixed bg-white border rounded shadow-lg p-2 min-w-[200px] z-[99999] pointer-events-auto"
+      :style="{ 
+        left: editMenuPosition.x + 'px', 
+        top: editMenuPosition.y + 'px'
+      }"
+      @click.stop
+    >
+      <button 
+        @click="editInWp({ id: editMenuId })"
+        class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+      >
+        📝 Редактировать в WordPress
+      </button>
+      <button 
+        @click="editInOurFormById(editMenuId)"
+        class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
+      >
+        ✏️ Редактировать в нашей форме
+      </button>
+      <button 
+        @click="editMenuId = null; document.removeEventListener('click', closeEditMenuOnOutsideClick, true);"
+        class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-slate-500"
+      >
+        Отмена
+      </button>
+    </div>
+
     <div v-if="error" class="text-red-700 mb-2">{{ error }}</div>
     <div v-if="activeTab === 'pages'" class="overflow-auto">
       <table class="min-w-full text-sm">
@@ -396,31 +426,6 @@
                     class="underline hover:text-blue-600 cursor-pointer"
                     v-html="highlightText(p.title, tableSearchQuery)"
                   ></button>
-                  <div 
-                    v-if="editMenuId === p.id" 
-                    :data-edit-menu-id="p.id"
-                    class="absolute z-50 mt-1 bg-white border rounded shadow-lg p-2 min-w-[200px]"
-                    @click.stop
-                  >
-                    <button 
-                      @click="editInWp(p)"
-                      class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                    >
-                      📝 Редактировать в WordPress
-                    </button>
-                    <button 
-                      @click="editInOurForm(p)"
-                      class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
-                    >
-                      ✏️ Редактировать в нашей форме
-                    </button>
-                    <button 
-                      @click="editMenuId = null; document.removeEventListener('click', closeEditMenuOnOutsideClick, true);"
-                      class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-slate-500"
-                    >
-                      Отмена
-                    </button>
-                  </div>
                 </div>
                 <div class="text-slate-500" v-html="highlightText(p.slug, tableSearchQuery)"></div>
               </td>
@@ -1314,6 +1319,7 @@ const newPage = reactive({
 });
 
 const editMenuId = ref(null);
+const editMenuPosition = ref({ x: 0, y: 0 });
 const editPageModalOpen = ref(false);
 const editingPage = ref(null);
 const updating = ref(false);
@@ -2298,9 +2304,15 @@ async function confirmBulk() {
 // Меню выбора способа редактирования
 function showEditMenu(page, e) {
   e?.stopPropagation();
+  const buttonRect = e.currentTarget.getBoundingClientRect();
+  
   // Закрываем предыдущее меню, если открыто другое
   if (editMenuId.value !== page.id) {
     editMenuId.value = page.id;
+    editMenuPosition.value = {
+      x: buttonRect.left,
+      y: buttonRect.top + buttonRect.height + 8
+    };
     // Добавляем обработчик для закрытия при клике вне меню
     // Используем setTimeout, чтобы не закрыть меню сразу же
     setTimeout(() => {
@@ -2318,8 +2330,8 @@ function closeEditMenuOnOutsideClick(e) {
     return;
   }
   
-  // Ищем меню и кнопку открытия для текущего ID
-  const menuElement = document.querySelector(`[data-edit-menu-id="${editMenuId.value}"]`);
+  // Ищем меню с fixed позиционированием и кнопку открытия для текущего ID
+  const menuElement = document.querySelector('.fixed.bg-white.border.rounded.shadow-lg');
   const buttonElement = document.querySelector(`[data-edit-menu-button][data-page-id="${editMenuId.value}"]`);
   
   // Проверяем, был ли клик внутри меню или на кнопке
