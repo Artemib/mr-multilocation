@@ -45,6 +45,29 @@
       </div>
     </div>
 
+    <!-- Подтверждение публикации -->
+    <div v-if="publishConfirmPage" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-[9999] bg-white border-2 border-green-300 rounded-lg shadow-xl p-4 min-w-[300px]">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-green-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="font-medium text-slate-900">Опубликовать страницу</h3>
+          <p class="text-sm text-slate-600 mt-1">
+            Хотите опубликовать страницу <strong>"{{ publishConfirmPage.title }}"</strong>?
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <Button variant="secondary" size="sm" @click="cancelPublish">Отмена</Button>
+        <Button variant="primary" size="sm" @click="confirmPublish" class="bg-green-600 hover:bg-green-700 text-white">
+          Опубликовать
+        </Button>
+      </div>
+    </div>
+
     <div v-if="bulkConfirmOpen" class="fixed top-12 left-0 right-0 bg-yellow-100 text-yellow-800 p-3 z-50 border-b border-yellow-300 flex items-center justify-between shadow-md">
       <span>Применить настройки к <strong>{{ bulk.selectedPageIds.length }}</strong> выбранным страницам?</span>
       <div class="flex gap-2">
@@ -88,7 +111,6 @@
           Все страницы
         </button>
         <button
-          v-if="draftItems.length > 0"
           @click="activeTab = 'draft'"
           :class="activeTab === 'draft' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
@@ -99,7 +121,6 @@
           </span>
         </button>
         <button
-          v-if="pendingItems.length > 0"
           @click="activeTab = 'pending'"
           :class="activeTab === 'pending' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
@@ -110,7 +131,6 @@
           </span>
         </button>
         <button
-          v-if="futureItems.length > 0"
           @click="activeTab = 'future'"
           :class="activeTab === 'future' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
@@ -121,7 +141,6 @@
           </span>
         </button>
         <button
-          v-if="trashItems.length > 0"
           @click="activeTab = 'trash'"
           :class="activeTab === 'trash' ? 'border-red-400 text-red-600' : 'border-transparent text-red-400 hover:text-red-600 hover:border-red-300'"
           class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
@@ -161,6 +180,19 @@
         />
       </div>
       <div class="flex gap-2">
+        <div v-if="selectedIds.length > 0" class="flex items-center gap-2">
+          <span class="text-sm text-slate-600">{{ selectedIds.length }} выбрано</span>
+          <Select v-model="bulkAction" class="w-40">
+            <option value="edit">Изменить</option>
+            <option value="delete">Удалить</option>
+          </Select>
+          <Button 
+            :variant="bulkAction === 'delete' ? 'danger' : 'primary'" 
+            @click="handleBulkAction"
+          >
+            Применить
+          </Button>
+        </div>
         <Button variant="secondary" @click="openBulkModal">Массовые настройки</Button>
         <Button @click="filtersModalOpen = true">
           Фильтры
@@ -251,7 +283,9 @@
             </div>
           </div>
         </div>
-        <div class="flex gap-2 justify-end">
+        
+        <!-- Фиксированные кнопки внутри попапа -->
+        <div class="sticky bottom-0 bg-white border-t border-slate-200 -mx-6 px-6 pt-4 pb-6 mt-6 flex gap-2 justify-end">
           <Button variant="secondary" @click="closeFiltersModal">Закрыть</Button>
         </div>
     </Modal>
@@ -264,7 +298,8 @@
     >
       <div class="space-y-4">
         <p class="text-sm text-slate-600 mb-4">
-          Перетащите колонки для изменения порядка. Отметьте колонки, которые хотите скрыть.
+          Перетащите колонки для изменения порядка. Отметьте колонки, которые хотите скрыть.<br>
+          <span class="text-xs text-slate-500">💡 Подсказка: измените ширину колонок прямо в таблице, потянув за правую границу заголовка колонки.</span>
         </p>
         <div class="space-y-2">
           <div 
@@ -291,19 +326,6 @@
               />
               <span class="text-sm">{{ col.label }}</span>
             </label>
-            <div class="flex items-center gap-2">
-              <div class="flex items-center gap-1">
-                <span class="text-xs text-slate-500">Ширина:</span>
-                <input 
-                  type="text" 
-                  v-model="col.width"
-                  @change="saveColumnsSettings"
-                  @blur="validateWidth(col)"
-                  class="w-20 px-2 py-1 text-xs border rounded"
-                  placeholder="200px"
-                />
-              </div>
-            </div>
             <div class="flex gap-1">
               <button
                 v-if="index > 0"
@@ -338,15 +360,25 @@
     <!-- Глобальный тултип с fixed позиционированием -->
     <div 
       v-if="tooltip.visible"
-      class="fixed px-3 py-2 bg-slate-800 text-white text-xs rounded shadow-xl z-[99999] max-w-md pointer-events-none"
+      class="fixed px-3 py-2 bg-slate-800 text-white text-xs rounded shadow-xl z-[99999] max-w-md"
+      :class="tooltip.isUrl ? 'pointer-events-auto' : 'pointer-events-none'"
       :style="{ 
         left: tooltip.x + 'px', 
         top: tooltip.y + 'px',
         transform: 'translateX(-50%)'
       }"
+      @click.stop
     >
       <div v-if="tooltip.isUrl">
-        <div v-for="(line, idx) in tooltip.lines" :key="idx" class="mb-1 last:mb-0 whitespace-nowrap overflow-hidden text-ellipsis" :title="line">{{ line }}</div>
+        <div v-for="(url, idx) in tooltip.urls" :key="idx" class="mb-1 last:mb-0">
+          <a 
+            :href="url" 
+            target="_blank"
+            class="text-blue-300 hover:text-blue-100 hover:underline whitespace-nowrap block overflow-hidden text-ellipsis"
+            :title="url"
+            v-html="highlightText(url.replace(/^https?:\/\//, '').replace(/\/$/, ''), tableSearchQuery)"
+          ></a>
+        </div>
       </div>
       <div v-else-if="tooltip.isList">
         <div v-for="(row, rowIdx) in tooltip.rows" :key="rowIdx" class="mb-1 last:mb-0">
@@ -367,6 +399,13 @@
       @click.stop
     >
       <button 
+        v-if="activeTab === 'draft' || activeTab === 'pending' || activeTab === 'future'"
+        @click="publishFromMenu(editMenuId)"
+        class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-green-600"
+      >
+        ✅ Опубликовать
+      </button>
+      <button 
         @click="editInWp({ id: editMenuId })"
         class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm"
       >
@@ -379,10 +418,10 @@
         ✏️ Редактировать в нашей форме
       </button>
       <button 
-        @click="editMenuId = null; document.removeEventListener('click', closeEditMenuOnOutsideClick, true);"
-        class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-slate-500"
+        @click="deleteFromMenu(editMenuId)"
+        class="block w-full text-left px-3 py-2 hover:bg-slate-100 rounded text-sm text-red-600"
       >
-        Отмена
+        🗑️ Удалить
       </button>
     </div>
 
@@ -397,10 +436,26 @@
             <th 
               v-for="col in orderedVisibleColumns" 
               :key="col.key" 
-              class="py-2 pr-4 overflow-hidden"
-              :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              class="py-2 overflow-hidden relative select-none group"
+              :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none', position: 'relative', paddingRight: '8px' }"
             >
-              {{ col.label }}
+              <div class="flex items-center pr-6">
+                <span>{{ col.label }}</span>
+              </div>
+              <!-- Resize handle -->
+              <div
+                class="absolute top-0 right-0 w-3 h-full cursor-col-resize"
+                @mousedown.stop="startResize($event, col)"
+                @dblclick.stop="autoFitColumn(col)"
+                style="user-select: none; touch-action: none;"
+                :style="{ zIndex: resizingColumn?.key === col.key ? 20 : 10 }"
+              >
+                <div 
+                  class="w-0.5 h-full transition-colors absolute top-0"
+                  :class="resizingColumn?.key === col.key ? 'bg-blue-500' : 'bg-transparent group-hover:bg-blue-400'"
+                  style="right: 4px;"
+                ></div>
+              </div>
             </th>
             <th class="py-2 pr-4 sticky right-0 bg-white z-10 border-l border-slate-200">
               Действия
@@ -408,7 +463,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in displayedItems" :key="p.id" class="border-b align-top">
+          <tr v-for="p in displayedItems" :key="p.id" class="border-b align-top" :data-page-id="p.id">
             <td class="py-2 pr-4">
               <input type="checkbox" :value="p.id" v-model="selectedIds" />
             </td>
@@ -428,6 +483,24 @@
                   ></button>
                 </div>
                 <div class="text-slate-500" v-html="highlightText(p.slug, tableSearchQuery)"></div>
+              </td>
+              <td 
+                v-else-if="col.key === 'status'" 
+                class="py-2 pr-4 overflow-hidden"
+                :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
+              >
+                <span 
+                  class="inline-block text-xs px-2 py-0.5 rounded font-medium"
+                  :class="{
+                    'bg-green-100 text-green-800': p.status === 'publish',
+                    'bg-yellow-100 text-yellow-800': p.status === 'draft',
+                    'bg-orange-100 text-orange-800': p.status === 'pending',
+                    'bg-blue-100 text-blue-800': p.status === 'future',
+                    'bg-red-100 text-red-800': p.status === 'trash'
+                  }"
+                >
+                  {{ getStatusLabel(p.status) }}
+                </span>
               </td>
               <td 
                 v-else-if="col.key === 'seo_title'" 
@@ -451,7 +524,7 @@
                 :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
               >
                 <div v-if="p.visibility?.folders?.length" class="flex items-center gap-1 flex-wrap">
-                  <template v-for="(folderId, idx) in (hasSearchInFolders(p) ? p.visibility.folders : p.visibility.folders.slice(0, 2))" :key="folderId">
+                  <template v-for="(folderId, idx) in (hasSearchInFolders(p) ? p.visibility.folders : getVisibleFolders(p, col))" :key="folderId">
                     <span 
                       class="inline-block text-xs bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[80px]"
                       :title="mapFolderIdsToSlugs([folderId], p.folders)[0]"
@@ -459,13 +532,13 @@
                     ></span>
                   </template>
                   <span 
-                    v-if="!hasSearchInFolders(p) && p.visibility.folders.length > 2"
+                    v-if="!hasSearchInFolders(p) && shouldShowFolderCounter(p, col)"
                     class="relative"
                     @mouseenter="showTooltip($event, mapFolderIdsToSlugs(p.visibility.folders, p.folders).join(', '), 'list')"
                     @mouseleave="hideTooltip()"
                   >
                     <span class="text-xs text-slate-500 cursor-help">
-                      +{{ p.visibility.folders.length - 2 }}
+                      +{{ p.visibility.folders.length - getVisibleFoldersCount(p, col) }}
                     </span>
                   </span>
                 </div>
@@ -477,7 +550,7 @@
                 :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
               >
                 <div v-if="p.visibility?.subdomains?.length" class="flex items-center gap-1 flex-wrap">
-                  <template v-for="(subId, idx) in (hasSearchInSubdomains(p) ? p.visibility.subdomains : p.visibility.subdomains.slice(0, 2))" :key="subId">
+                  <template v-for="(subId, idx) in (hasSearchInSubdomains(p) ? p.visibility.subdomains : getVisibleSubdomains(p, col))" :key="subId">
                     <span 
                       class="inline-block text-xs bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[80px]"
                       :title="mapSubIdsToSlugs([subId], p.subdomains)[0]"
@@ -485,13 +558,13 @@
                     ></span>
                   </template>
                   <span 
-                    v-if="!hasSearchInSubdomains(p) && p.visibility.subdomains.length > 2"
+                    v-if="!hasSearchInSubdomains(p) && shouldShowSubdomainCounter(p, col)"
                     class="relative"
                     @mouseenter="showTooltip($event, mapSubIdsToSlugs(p.visibility.subdomains, p.subdomains).join(', '), 'list')"
                     @mouseleave="hideTooltip()"
                   >
                     <span class="text-xs text-slate-500 cursor-help">
-                      +{{ p.visibility.subdomains.length - 2 }}
+                      +{{ p.visibility.subdomains.length - getVisibleSubdomainsCount(p, col) }}
                     </span>
                   </span>
                 </div>
@@ -503,7 +576,7 @@
                 :style="{ width: col.width || 'auto', minWidth: col.width || 'auto', maxWidth: col.width || 'none' }"
               >
                 <div v-if="p.urls?.length" class="space-y-0.5">
-                  <template v-for="(url, idx) in (hasSearchInUrls(p) ? p.urls : p.urls.slice(0, 1))" :key="url">
+                  <template v-for="(url, idx) in (hasSearchInUrls(p) ? p.urls : getVisibleUrls(p, col))" :key="url">
                     <div class="text-xs">
                       <a 
                         :href="url" 
@@ -515,13 +588,12 @@
                     </div>
                   </template>
                   <span 
-                    v-if="!hasSearchInUrls(p) && p.urls.length > 1"
+                    v-if="!hasSearchInUrls(p) && shouldShowUrlCounter(p, col)"
                     class="relative"
-                    @mouseenter="showTooltip($event, p.urls.slice(1).join('\\n'), 'url')"
-                    @mouseleave="hideTooltip()"
+                    @click.stop="showUrlTooltip($event, p.urls)"
                   >
-                    <span class="text-xs text-slate-500 cursor-help">
-                      +{{ p.urls.length - 1 }} URL
+                    <span class="text-xs text-slate-500 cursor-pointer hover:text-slate-700">
+                      +{{ p.urls.length - getVisibleUrlsCount(p, col) }} URL
                     </span>
                   </span>
                 </div>
@@ -643,37 +715,66 @@
           <thead>
             <tr class="text-left border-b">
               <th class="py-2 pr-4">Название</th>
-              <th class="py-2 pr-4">Слаг</th>
               <th class="py-2 pr-4">Дата изменения</th>
-              <th class="py-2 pr-4"></th>
+              <th class="py-2 pr-4">Действия</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="p in draftItems" :key="p.id" class="border-b align-top">
               <td class="py-2 pr-4">
-                <a :href="editUrl(p.id)" target="_blank" class="text-blue-600 hover:underline">{{ p.title }}</a>
-              </td>
-              <td class="py-2 pr-4">
-                <span class="text-slate-500">{{ p.slug }}</span>
+                <div class="relative">
+                  <button 
+                    @click.stop="showEditMenu(p, $event)"
+                    :data-edit-menu-button="p.id"
+                    :data-page-id="p.id"
+                    class="underline hover:text-blue-600 cursor-pointer"
+                  >
+                    {{ p.title }}
+                  </button>
+                </div>
+                <div class="text-slate-500" v-html="highlightText(p.slug, '')"></div>
               </td>
               <td class="py-2 pr-4">
                 <span class="text-slate-500 text-xs">{{ p.date }}</span>
               </td>
               <td class="py-2 pr-4">
-                <div class="flex gap-2 items-center">
-                  <button @click="editInOurFormById(p.id)" class="text-blue-600 hover:text-blue-800" title="Редактировать">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <div class="flex items-center gap-2">
+                  <button 
+                    v-if="activeTab === 'draft' || activeTab === 'pending' || activeTab === 'future'"
+                    @click="showPublishConfirm(p)"
+                    class="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                    title="Опубликовать"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </button>
-                  <button @click="changeStatus(p.id, 'publish')" class="text-green-600 hover:text-green-800" title="Опубликовать">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  <a 
+                    :href="editUrl(p.id)"
+                    target="_blank"
+                    class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                    title="Редактировать в WordPress"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                    </svg>
+                  </a>
+                  <button 
+                    @click="editInOurForm(p)"
+                    class="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded transition-colors"
+                    title="Редактировать в форме плагина"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                     </svg>
                   </button>
-                  <button @click="confirmDeletePage(p)" class="text-red-600 hover:text-red-800" title="Удалить в корзину">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <button 
+                    @click="showDeleteConfirm(p)"
+                    class="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    title="Удалить страницу"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                     </svg>
                   </button>
                 </div>
@@ -693,37 +794,66 @@
           <thead>
             <tr class="text-left border-b">
               <th class="py-2 pr-4">Название</th>
-              <th class="py-2 pr-4">Слаг</th>
               <th class="py-2 pr-4">Дата изменения</th>
-              <th class="py-2 pr-4"></th>
+              <th class="py-2 pr-4">Действия</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="p in pendingItems" :key="p.id" class="border-b align-top">
               <td class="py-2 pr-4">
-                <a :href="editUrl(p.id)" target="_blank" class="text-blue-600 hover:underline">{{ p.title }}</a>
-              </td>
-              <td class="py-2 pr-4">
-                <span class="text-slate-500">{{ p.slug }}</span>
+                <div class="relative">
+                  <button 
+                    @click.stop="showEditMenu(p, $event)"
+                    :data-edit-menu-button="p.id"
+                    :data-page-id="p.id"
+                    class="underline hover:text-blue-600 cursor-pointer"
+                  >
+                    {{ p.title }}
+                  </button>
+                </div>
+                <div class="text-slate-500" v-html="highlightText(p.slug, '')"></div>
               </td>
               <td class="py-2 pr-4">
                 <span class="text-slate-500 text-xs">{{ p.date }}</span>
               </td>
               <td class="py-2 pr-4">
-                <div class="flex gap-2 items-center">
-                  <button @click="editInOurFormById(p.id)" class="text-blue-600 hover:text-blue-800" title="Редактировать">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <div class="flex items-center gap-2">
+                  <button 
+                    v-if="activeTab === 'draft' || activeTab === 'pending' || activeTab === 'future'"
+                    @click="changeStatus(p.id, 'publish')"
+                    class="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                    title="Опубликовать"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </button>
-                  <button @click="changeStatus(p.id, 'publish')" class="text-green-600 hover:text-green-800" title="Опубликовать">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  <a 
+                    :href="editUrl(p.id)"
+                    target="_blank"
+                    class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                    title="Редактировать в WordPress"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                    </svg>
+                  </a>
+                  <button 
+                    @click="editInOurForm(p)"
+                    class="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded transition-colors"
+                    title="Редактировать в форме плагина"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                     </svg>
                   </button>
-                  <button @click="confirmDeletePage(p)" class="text-red-600 hover:text-red-800" title="Удалить в корзину">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <button 
+                    @click="showDeleteConfirm(p)"
+                    class="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    title="Удалить страницу"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                     </svg>
                   </button>
                 </div>
@@ -743,37 +873,66 @@
           <thead>
             <tr class="text-left border-b">
               <th class="py-2 pr-4">Название</th>
-              <th class="py-2 pr-4">Слаг</th>
               <th class="py-2 pr-4">Дата публикации</th>
-              <th class="py-2 pr-4"></th>
+              <th class="py-2 pr-4">Действия</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="p in futureItems" :key="p.id" class="border-b align-top">
               <td class="py-2 pr-4">
-                <a :href="editUrl(p.id)" target="_blank" class="text-blue-600 hover:underline">{{ p.title }}</a>
-              </td>
-              <td class="py-2 pr-4">
-                <span class="text-slate-500">{{ p.slug }}</span>
+                <div class="relative">
+                  <button 
+                    @click.stop="showEditMenu(p, $event)"
+                    :data-edit-menu-button="p.id"
+                    :data-page-id="p.id"
+                    class="underline hover:text-blue-600 cursor-pointer"
+                  >
+                    {{ p.title }}
+                  </button>
+                </div>
+                <div class="text-slate-500" v-html="highlightText(p.slug, '')"></div>
               </td>
               <td class="py-2 pr-4">
                 <span class="text-slate-500 text-xs">{{ p.date }}</span>
               </td>
               <td class="py-2 pr-4">
-                <div class="flex gap-2 items-center">
-                  <button @click="editInOurFormById(p.id)" class="text-blue-600 hover:text-blue-800" title="Редактировать">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <div class="flex items-center gap-2">
+                  <button 
+                    v-if="activeTab === 'draft' || activeTab === 'pending' || activeTab === 'future'"
+                    @click="showPublishConfirm(p)"
+                    class="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                    title="Опубликовать"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </button>
-                  <button @click="changeStatus(p.id, 'publish')" class="text-green-600 hover:text-green-800" title="Опубликовать">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  <a 
+                    :href="editUrl(p.id)"
+                    target="_blank"
+                    class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                    title="Редактировать в WordPress"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                    </svg>
+                  </a>
+                  <button 
+                    @click="editInOurForm(p)"
+                    class="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded transition-colors"
+                    title="Редактировать в форме плагина"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                     </svg>
                   </button>
-                  <button @click="confirmDeletePage(p)" class="text-red-600 hover:text-red-800" title="Удалить в корзину">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <button 
+                    @click="showDeleteConfirm(p)"
+                    class="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    title="Удалить страницу"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                     </svg>
                   </button>
                 </div>
@@ -785,82 +944,37 @@
     </div>
 
 
+    <!-- Подтверждение массового удаления -->
+    <div v-if="bulkDeleteConfirmOpen" class="fixed top-12 left-1/2 transform -translate-x-1/2 z-[9999] bg-white border-2 border-red-300 rounded-lg shadow-xl p-4 min-w-[300px]">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-red-600">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="font-medium text-slate-900">Удалить страницы</h3>
+          <p class="text-sm text-slate-600 mt-1">
+            Вы уверены, что хотите удалить <strong>{{ selectedIds.length }}</strong> страниц?
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <Button variant="secondary" size="sm" @click="cancelBulkDelete">Отмена</Button>
+        <Button variant="danger" size="sm" @click="confirmBulkDelete">
+          Удалить
+        </Button>
+      </div>
+    </div>
+
     <!-- Модальное окно массовых настроек -->
     <Modal 
       v-model="bulkModalOpen"
-      title="Массовые настройки видимости"
+      title="Массовые настройки"
       size="lg"
     >
-        
-        <div class="mb-4">
-          <label class="text-slate-600 mr-2">Правило:</label>
-          <Select v-model="bulk.rule">
-            <option value="all">Показывать везде</option>
-            <option value="allow">Только выбранные</option>
-            <option value="deny">Скрывать выбранные</option>
-          </Select>
-        </div>
-        
-        <div v-if="bulk.rule !== 'all'" class="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-slate-600">Папки</div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                @click="toggleAllBulkFolders"
-                class="text-xs"
-              >
-                {{ allBulkFoldersSelected ? 'Снять все' : 'Выбрать все' }}
-              </Button>
-            </div>
-            <Input 
-              v-model="searchFolderQuery" 
-              placeholder="Поиск папок..." 
-              size="sm"
-              class="w-full mb-2"
-            />
-            <div class="text-xs text-slate-500 mb-1">
-              Показано: {{ filteredFolders.length }} из {{ allFolders.length }}
-            </div>
-            <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
-              <label v-for="f in filteredFolders" :key="f.id" class="block mb-1">
-                <input type="checkbox" :value="Number(f.id)" v-model="bulk.folders" /> <span v-html="highlightText(f.slug, searchFolderQuery)"></span>
-              </label>
-              <div v-if="filteredFolders.length === 0" class="text-slate-500 text-xs">Не найдено</div>
-            </div>
-          </div>
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-slate-600">Поддомены</div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                @click="toggleAllBulkSubdomains"
-                class="text-xs"
-              >
-                {{ allBulkSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
-              </Button>
-            </div>
-            <Input 
-              v-model="searchSubdomainQuery" 
-              placeholder="Поиск поддоменов..." 
-              size="sm"
-              class="w-full mb-2"
-            />
-            <div class="text-xs text-slate-500 mb-1">
-              Показано: {{ filteredSubdomains.length }} из {{ allSubdomains.length }}
-            </div>
-            <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
-              <label v-for="s in filteredSubdomains" :key="s.id" class="block mb-1">
-                <input type="checkbox" :value="Number(s.id)" v-model="bulk.subdomains" /> <span v-html="highlightText(s.slug, searchSubdomainQuery)"></span>
-              </label>
-              <div v-if="filteredSubdomains.length === 0" class="text-slate-500 text-xs">Не найдено</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="mb-4 border-t pt-4">
+        <!-- Список страниц вверху -->
+        <div class="mb-4 border-b pb-4">
           <div class="flex items-center justify-between mb-2">
             <label class="text-slate-600 font-medium">Страницы для применения ({{ bulk.selectedPageIds.length }} выбрано):</label>
             <Button variant="ghost" size="sm" @click="toggleSelectAllInBulk">{{ allBulkPagesSelected ? 'Снять все' : 'Выбрать все' }}</Button>
@@ -874,15 +988,129 @@
             Показано: {{ filteredItems.length }} из {{ filteredItemsAll.length }} найдено (всего {{ items.length }})
             <span v-if="filteredItemsAll.length > 10" class="text-orange-600"> — уточните поиск, чтобы увидеть все</span>
           </div>
-          <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
-            <label v-for="p in filteredItems" :key="p.id" class="block mb-1 hover:bg-slate-50">
-              <input type="checkbox" :value="p.id" v-model="bulk.selectedPageIds" /> <span v-html="highlightText(p.title, searchQuery)"></span> <span class="text-slate-500 text-xs" v-html="'(' + highlightText(p.slug, searchQuery) + ')'"></span>
+          <div class="border rounded p-2" style="height: 150px; overflow-y: auto;">
+            <label v-for="p in filteredItems" :key="p.id" class="block mb-1">
+              <input type="checkbox" :value="p.id" v-model="bulk.selectedPageIds" /> <span v-html="highlightText(p.title, searchQuery)"></span>
             </label>
-            <div v-if="filteredItems.length === 0" class="text-slate-500 text-xs text-center py-2">Не найдено</div>
+            <div v-if="filteredItems.length === 0" class="text-slate-500 text-xs">Не найдено</div>
           </div>
         </div>
-
-        <div class="flex gap-2 justify-end">
+        
+        <!-- Статус страниц -->
+        <div class="mb-4">
+          <label class="text-slate-600 font-medium mb-2 block">Статус страниц:</label>
+          <Select v-model="bulk.status">
+            <option value="publish">Опубликовано</option>
+            <option value="draft">Черновик</option>
+            <option value="pending">Ожидает проверки</option>
+            <option value="future">Запланировано</option>
+          </Select>
+        </div>
+        
+        <!-- Дата и время для запланированных страниц -->
+        <div v-if="bulk.status === 'future'" class="mb-4">
+          <label class="text-slate-600 font-medium mb-2 block">Дата и время публикации:</label>
+          <input 
+            type="datetime-local" 
+            v-model="bulk.date"
+            class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        
+        <!-- Блок видимости с аккордеоном -->
+        <div class="mb-4 border-t pt-4">
+          <button 
+            @click="bulkVisibilityOpen = !bulkVisibilityOpen"
+            class="flex items-center justify-between w-full text-left text-slate-600 font-medium mb-2 hover:text-slate-800"
+          >
+            <span>Видимость страниц</span>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke-width="1.5" 
+              stroke="currentColor" 
+              class="w-5 h-5 transition-transform"
+              :class="{ 'rotate-180': bulkVisibilityOpen }"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+          
+          <div v-show="bulkVisibilityOpen" class="space-y-4">
+            <!-- Правило видимости -->
+            <div>
+              <label class="text-slate-600 font-medium mb-2 block">Правило видимости:</label>
+              <Select v-model="bulk.rule">
+                <option value="all">Показывать везде</option>
+                <option value="allow">Только выбранные</option>
+                <option value="deny">Скрывать выбранные</option>
+              </Select>
+            </div>
+            
+            <div v-if="bulk.rule !== 'all'" class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <div class="text-slate-600">Папки</div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    @click="toggleAllBulkFolders"
+                    class="text-xs"
+                  >
+                    {{ allBulkFoldersSelected ? 'Снять все' : 'Выбрать все' }}
+                  </Button>
+                </div>
+                <Input 
+                  v-model="searchFolderQuery" 
+                  placeholder="Поиск папок..." 
+                  size="sm"
+                  class="w-full mb-2"
+                />
+                <div class="text-xs text-slate-500 mb-1">
+                  Показано: {{ filteredFolders.length }} из {{ allFolders.length }}
+                </div>
+                <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
+                  <label v-for="f in filteredFolders" :key="f.id" class="block mb-1">
+                    <input type="checkbox" :value="Number(f.id)" v-model="bulk.folders" /> <span v-html="highlightText(f.slug, searchFolderQuery)"></span>
+                  </label>
+                  <div v-if="filteredFolders.length === 0" class="text-slate-500 text-xs">Не найдено</div>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <div class="text-slate-600">Поддомены</div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    @click="toggleAllBulkSubdomains"
+                    class="text-xs"
+                  >
+                    {{ allBulkSubdomainsSelected ? 'Снять все' : 'Выбрать все' }}
+                  </Button>
+                </div>
+                <Input 
+                  v-model="searchSubdomainQuery" 
+                  placeholder="Поиск поддоменов..." 
+                  size="sm"
+                  class="w-full mb-2"
+                />
+                <div class="text-xs text-slate-500 mb-1">
+                  Показано: {{ filteredSubdomains.length }} из {{ allSubdomains.length }}
+                </div>
+                <div class="border rounded p-2" style="height: 100px; overflow-y: auto;">
+                  <label v-for="s in filteredSubdomains" :key="s.id" class="block mb-1">
+                    <input type="checkbox" :value="Number(s.id)" v-model="bulk.subdomains" /> <span v-html="highlightText(s.slug, searchSubdomainQuery)"></span>
+                  </label>
+                  <div v-if="filteredSubdomains.length === 0" class="text-slate-500 text-xs">Не найдено</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Фиксированные кнопки внутри попапа -->
+        <div class="sticky bottom-0 bg-white border-t border-slate-200 -mx-6 px-6 pt-4 pb-6 mt-6 flex gap-2 justify-end">
           <Button variant="secondary" @click="closeBulkModal">Отмена</Button>
           <Button variant="primary" @click="applyBulk" :disabled="bulk.selectedPageIds.length === 0">
             Применить к выбранным ({{ bulk.selectedPageIds.length }})
@@ -1065,7 +1293,8 @@
         </div>
       </div>
       
-      <div class="flex gap-2 justify-end mt-6">
+      <!-- Фиксированные кнопки внутри попапа -->
+      <div class="sticky bottom-0 bg-white border-t border-slate-200 -mx-6 px-6 pt-4 pb-6 mt-6 flex gap-2 justify-end">
         <Button variant="secondary" @click="closeCreateModal">Отмена</Button>
         <Button variant="primary" @click="createPage" :disabled="!newPage.title || creating">
           {{ creating ? 'Создание...' : 'Создать' }}
@@ -1248,7 +1477,8 @@
         </div>
       </div>
       
-      <div class="flex gap-2 justify-end mt-6">
+      <!-- Фиксированные кнопки внутри попапа -->
+      <div class="sticky bottom-0 bg-white border-t border-slate-200 -mx-6 px-6 pt-4 pb-6 mt-6 flex gap-2 justify-end">
         <Button variant="secondary" @click="closeEditPageModal">Отмена</Button>
         <Button variant="primary" @click="updatePage" :disabled="!editPage.title || updating">
           {{ updating ? 'Сохранение...' : 'Сохранить' }}
@@ -1264,6 +1494,7 @@ import { Button, Input, Select, Modal, ShowMorePagination } from '../components'
 import { highlightText } from '../utils/highlight.js';
 const boot = inject('boot');
 const api = inject('api');
+const operatingMode = ref('hybrid'); // Режим работы: 'subdomain', 'folder', 'hybrid'
 const items = ref([]);
 const error = ref('');
 const listUrl = `${boot.adminUrl}edit.php?post_type=multiregional_page`;
@@ -1282,12 +1513,16 @@ const futureLoading = ref(false);
 const bulkModalOpen = ref(false);
 const searchQuery = ref('');
 const selectedIds = ref([]);
-const bulk = reactive({ rule: 'allow', folders: [], subdomains: [], selectedPageIds: [] });
+const bulk = reactive({ rule: 'allow', folders: [], subdomains: [], selectedPageIds: [], status: 'publish', date: '' });
+const bulkVisibilityOpen = ref(true); // Состояние аккордеона видимости
+const bulkAction = ref('edit'); // 'edit' или 'delete'
+const bulkDeleteConfirmOpen = ref(false);
 const allFolders = ref([]);
 const allSubdomains = ref([]);
 
 // Тултип с fixed позиционированием
-const tooltip = ref({ visible: false, text: '', x: 0, y: 0 });
+const tooltip = ref({ visible: false, text: '', x: 0, y: 0, urls: [] });
+const urlTooltipPageId = ref(null); // ID страницы, для которой открыт URL tooltip
 
 const tableSearchQuery = ref('');
 const tableFilterFolders = ref([]);
@@ -1325,6 +1560,7 @@ const editingPage = ref(null);
 const updating = ref(false);
 const deletingPageId = ref(null);
 const deleteConfirmPage = ref(null);
+const publishConfirmPage = ref(null);
 const editPage = reactive({
   id: null,
   title: '',
@@ -1349,6 +1585,7 @@ const seoInfo = ref(null);
 // checkbox и actions всегда видимы и не участвуют в настройках
 const defaultColumns = [
   { key: 'title', label: 'Название', visible: true, width: '200px' },
+  { key: 'status', label: 'Статус', visible: true, width: '120px' },
   { key: 'seo_title', label: 'SEO Title', visible: true, width: '200px' },
   { key: 'seo_description', label: 'SEO Description', visible: true, width: '250px' },
   { key: 'folders', label: 'Папки', visible: true, width: '150px' },
@@ -1365,8 +1602,25 @@ const visibleColumns = computed(() => {
 });
 
 // Вычисляем упорядоченные видимые колонки для заголовков
+// Скрываем колонки в зависимости от режима работы
 const orderedVisibleColumns = computed(() => {
-  return tableColumns.value.filter(c => c.visible);
+  return tableColumns.value.filter(c => {
+    // Проверяем видимость
+    if (!c.visible) return false;
+    
+    // Скрываем колонку "folders" если режим = поддомены
+    if (c.key === 'folders' && operatingMode.value === 'subdomain') {
+      return false;
+    }
+    
+    // Скрываем колонку "subdomains" если режим = папки
+    if (c.key === 'subdomains' && operatingMode.value === 'folder') {
+      return false;
+    }
+    
+    // В гибридном режиме показываем обе колонки
+    return true;
+  });
 });
 
 // Сохраняем настройки колонок в localStorage
@@ -1374,9 +1628,24 @@ function saveColumnsSettings() {
   localStorage.setItem('mr_ml_table_columns', JSON.stringify(tableColumns.value));
 }
 
-// Сбрасываем настройки колонок
+// Сбрасываем настройки колонок (только порядок и видимость, сохраняем ширину)
 function resetColumnsSettings() {
+  // Сохраняем текущие ширины колонок
+  const currentWidths = {};
+  tableColumns.value.forEach(col => {
+    currentWidths[col.key] = col.width;
+  });
+  
+  // Сбрасываем порядок и видимость к значениям по умолчанию
   tableColumns.value = JSON.parse(JSON.stringify(defaultColumns));
+  
+  // Восстанавливаем сохранённые ширины
+  tableColumns.value.forEach(col => {
+    if (currentWidths[col.key]) {
+      col.width = currentWidths[col.key];
+    }
+  });
+  
   saveColumnsSettings();
 }
 
@@ -1422,31 +1691,173 @@ function moveColumn(index, direction) {
   }
 }
 
-// Валидация и нормализация ширины колонки
-function validateWidth(col) {
-  if (!col.width || col.width.trim() === '') {
-    const defaultCol = defaultColumns.find(dc => dc.key === col.key);
-    col.width = defaultCol?.width || 'auto';
-    saveColumnsSettings();
-    return;
+// Resize колонок (как в Excel)
+const resizingColumn = ref(null);
+const resizeStartX = ref(0);
+const resizeStartWidth = ref(0);
+
+function startResize(event, col) {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  resizingColumn.value = col;
+  resizeStartX.value = event.clientX;
+  
+  // Получаем текущую ширину колонки
+  const th = event.currentTarget.closest('th');
+  if (th) {
+    const rect = th.getBoundingClientRect();
+    resizeStartWidth.value = rect.width;
+    
+    // Если у колонки еще нет ширины, берем текущую
+    if (!col.width || col.width === 'auto') {
+      col.width = Math.round(rect.width) + 'px';
+    } else {
+      // Парсим существующую ширину
+      const match = col.width.match(/(\d+(?:\.\d+)?)/);
+      if (match) {
+        resizeStartWidth.value = parseFloat(match[1]);
+      }
+    }
+  } else {
+    // Fallback
+    resizeStartWidth.value = parseInt(col.width) || 150;
   }
   
-  // Проверяем формат: число + единица (px, %, em, rem, vw, vh)
-  const widthPattern = /^(\d+(?:\.\d+)?)(px|%|em|rem|vw|vh|auto)$/i;
-  if (!widthPattern.test(col.width.trim())) {
-    // Если формат неверный, пытаемся исправить
-    const numMatch = col.width.match(/\d+(?:\.\d+)?/);
-    if (numMatch) {
-      col.width = numMatch[0] + 'px';
-    } else {
-      const defaultCol = defaultColumns.find(dc => dc.key === col.key);
-      col.width = defaultCol?.width || 'auto';
-    }
-    saveColumnsSettings();
-  } else {
-    col.width = col.width.trim();
+  // Добавляем обработчики на document
+  document.addEventListener('mousemove', doResize, { passive: false });
+  document.addEventListener('mouseup', stopResize, { once: true });
+  
+  // Меняем курсор для всего документа
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  
+  // Предотвращаем выделение текста
+  event.preventDefault();
+}
+
+function doResize(event) {
+  if (!resizingColumn.value) return;
+  
+  event.preventDefault();
+  
+  const diff = event.clientX - resizeStartX.value;
+  const newWidth = Math.max(50, resizeStartWidth.value + diff); // минимум 50px
+  
+  // Обновляем ширину колонки
+  const widthStr = Math.round(newWidth) + 'px';
+  resizingColumn.value.width = widthStr;
+  
+  // Находим колонку в tableColumns и обновляем её ширину
+  const colInTable = tableColumns.value.find(c => c.key === resizingColumn.value.key);
+  if (colInTable) {
+    colInTable.width = widthStr;
+  }
+}
+
+function stopResize() {
+  if (resizingColumn.value) {
     saveColumnsSettings();
   }
+  
+  resizingColumn.value = null;
+  document.removeEventListener('mousemove', doResize);
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+}
+
+// Автоматическая подгонка ширины колонки под контент (как в Excel)
+function autoFitColumn(col) {
+  if (!col || !col.key) return;
+  
+  // Находим все ячейки этой колонки в таблице
+  const table = document.querySelector('table.min-w-full');
+  if (!table) return;
+  
+  // Находим индекс колонки среди видимых колонок
+  const headerCells = table.querySelectorAll('thead th');
+  let colIndex = -1;
+  headerCells.forEach((th, idx) => {
+    const thContent = th.textContent?.trim() || '';
+    const thKey = orderedVisibleColumns.value.find(c => c.label === thContent || c.key === col.key);
+    if (thKey && thKey.key === col.key) {
+      colIndex = idx;
+    }
+  });
+  
+  // Если не нашли по тексту, ищем по атрибуту или порядку
+  if (colIndex === -1) {
+    const visibleIndex = orderedVisibleColumns.value.findIndex(c => c.key === col.key);
+    if (visibleIndex !== -1) {
+      // +1 потому что первая колонка - это checkbox
+      colIndex = visibleIndex + 1;
+    }
+  }
+  
+  if (colIndex === -1) return;
+  
+  let maxWidth = 0;
+  
+  // Измеряем ширину заголовка
+  const headerCell = headerCells[colIndex];
+  if (headerCell) {
+    // Временно снимаем ограничения ширины для измерения
+    const originalStyle = headerCell.style.width;
+    headerCell.style.width = 'auto';
+    const headerWidth = headerCell.scrollWidth;
+    headerCell.style.width = originalStyle;
+    maxWidth = Math.max(maxWidth, headerWidth);
+  }
+  
+  // Измеряем ширину всех ячеек в колонке (первые 20 строк для производительности)
+  const rows = table.querySelectorAll('tbody tr');
+  const rowsToCheck = Math.min(20, rows.length);
+  
+  for (let i = 0; i < rowsToCheck; i++) {
+    const row = rows[i];
+    const cells = row.querySelectorAll('td');
+    const cell = cells[colIndex];
+    
+    if (cell) {
+      // Временно снимаем ограничения ширины для измерения
+      const originalStyle = cell.style.width;
+      const originalMinWidth = cell.style.minWidth;
+      const originalMaxWidth = cell.style.maxWidth;
+      
+      cell.style.width = 'auto';
+      cell.style.minWidth = 'auto';
+      cell.style.maxWidth = 'none';
+      
+      // Измеряем реальную ширину контента
+      const cellWidth = cell.scrollWidth;
+      
+      // Восстанавливаем стили
+      cell.style.width = originalStyle;
+      cell.style.minWidth = originalMinWidth;
+      cell.style.maxWidth = originalMaxWidth;
+      
+      maxWidth = Math.max(maxWidth, cellWidth);
+    }
+  }
+  
+  // Добавляем отступы (padding + resize handle)
+  const padding = 16; // pr-4 = 1rem = 16px
+  const resizeHandle = 12; // место для resize handle
+  const finalWidth = Math.max(50, maxWidth + padding + resizeHandle); // минимум 50px
+  
+  // Обновляем ширину колонки
+  col.width = Math.round(finalWidth) + 'px';
+  
+  // Обновляем в tableColumns
+  const colInTable = tableColumns.value.find(c => c.key === col.key);
+  if (colInTable) {
+    colInTable.width = col.width;
+  }
+  
+  // Сохраняем настройки
+  saveColumnsSettings();
+  
+  // Уведомление убрано по запросу пользователя
 }
 
 // Проверка наличия поискового запроса в папках
@@ -1477,6 +1888,104 @@ function hasSearchInUrls(page) {
     const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     return cleanUrl.toLowerCase().includes(q) || url.toLowerCase().includes(q);
   });
+}
+
+// Получить видимое количество URL в зависимости от ширины колонки
+// URL отображаются по одному на строке, поэтому считаем сколько строк поместится по высоте
+function getVisibleUrls(page, col) {
+  if (!page.urls?.length) return [];
+  
+  // Если есть поиск, показываем все
+  if (hasSearchInUrls(page)) {
+    return page.urls;
+  }
+  
+  // URL отображаются вертикально, поэтому всегда показываем только один
+  // Счётчик будет показываться если URL больше одного
+  return page.urls.slice(0, 1);
+}
+
+function getVisibleUrlsCount(page, col) {
+  return getVisibleUrls(page, col).length;
+}
+
+function shouldShowUrlCounter(page, col) {
+  if (!page.urls?.length) return false;
+  return page.urls.length > getVisibleUrlsCount(page, col);
+}
+
+// Получить видимое количество папок в зависимости от ширины колонки
+function getVisibleFolders(page, col) {
+  if (!page.visibility?.folders?.length) return [];
+  
+  // Если есть поиск, показываем все
+  if (hasSearchInFolders(page)) {
+    return page.visibility.folders;
+  }
+  
+  // Базовое количество - два
+  let count = 2;
+  
+  // Если колонка имеет ширину, пытаемся определить сколько поместится
+  if (col.width && col.width !== 'auto') {
+    const widthMatch = col.width.match(/(\d+(?:\.\d+)?)/);
+    if (widthMatch) {
+      const widthPx = parseFloat(widthMatch[1]);
+      // Каждая папка примерно 50-60px (с учётом текста и отступов)
+      // Добавляем отступ справа для счётчика ~30px
+      // И отступы ячейки ~16px (pr-4 = 1rem)
+      const availableWidth = widthPx - 46; // 30px для счётчика + 16px для отступов
+      count = Math.max(1, Math.floor(availableWidth / 60));
+    }
+  }
+  
+  return page.visibility.folders.slice(0, Math.min(count, page.visibility.folders.length));
+}
+
+function getVisibleFoldersCount(page, col) {
+  return getVisibleFolders(page, col).length;
+}
+
+function shouldShowFolderCounter(page, col) {
+  if (!page.visibility?.folders?.length) return false;
+  return page.visibility.folders.length > getVisibleFoldersCount(page, col);
+}
+
+// Получить видимое количество поддоменов в зависимости от ширины колонки
+function getVisibleSubdomains(page, col) {
+  if (!page.visibility?.subdomains?.length) return [];
+  
+  // Если есть поиск, показываем все
+  if (hasSearchInSubdomains(page)) {
+    return page.visibility.subdomains;
+  }
+  
+  // Базовое количество - два
+  let count = 2;
+  
+  // Если колонка имеет ширину, пытаемся определить сколько поместится
+  if (col.width && col.width !== 'auto') {
+    const widthMatch = col.width.match(/(\d+(?:\.\d+)?)/);
+    if (widthMatch) {
+      const widthPx = parseFloat(widthMatch[1]);
+      // Каждый поддомен примерно 50-60px (с учётом текста и отступов)
+      // Добавляем отступ справа для счётчика ~30px
+      // И отступы ячейки ~16px (pr-4 = 1rem)
+      const availableWidth = widthPx - 46; // 30px для счётчика + 16px для отступов
+      count = Math.max(1, Math.floor(availableWidth / 60));
+    }
+  }
+  
+  return page.visibility.subdomains.slice(0, Math.min(count, page.visibility.subdomains.length));
+}
+
+function getVisibleSubdomainsCount(page, col) {
+  return getVisibleSubdomains(page, col).length;
+}
+
+function shouldShowSubdomainCounter(page, col) {
+  if (!page.visibility?.subdomains?.length) return false;
+  return page.visibility.subdomains.length > getVisibleSubdomainsCount(page, col);
 }
 
 // Тултип с fixed позиционированием
@@ -1515,8 +2024,44 @@ function showTooltip(event, text, type = 'text') {
   tooltip.value = tooltipData;
 }
 
+function showUrlTooltip(event, urls) {
+  // Если tooltip уже открыт для этой страницы, закрываем его
+  const pageId = event.currentTarget.closest('tr')?.dataset?.pageId || null;
+  if (urlTooltipPageId.value === pageId && tooltip.value.visible && tooltip.value.isUrl) {
+    hideTooltip();
+    return;
+  }
+  
+  const rect = event.currentTarget.getBoundingClientRect();
+  
+  urlTooltipPageId.value = pageId;
+  tooltip.value = {
+    visible: true,
+    isUrl: true,
+    urls: urls,
+    x: rect.left + (rect.width / 2),
+    y: rect.top + rect.height + 8,
+    text: '',
+    lines: [],
+    rows: []
+  };
+}
+
 function hideTooltip() {
   tooltip.value.visible = false;
+  urlTooltipPageId.value = null;
+}
+
+// Функция получения текстового значения статуса
+function getStatusLabel(status) {
+  const labels = {
+    'publish': 'Опубликовано',
+    'draft': 'Черновик',
+    'pending': 'Ожидает',
+    'future': 'Запланировано',
+    'trash': 'В корзине'
+  };
+  return labels[status] || status;
 }
 
 // Функция транслитерации для создания слага
@@ -1580,14 +2125,58 @@ watch(() => newPage.title, (newTitle, oldTitle) => {
 
 // Отслеживание ручного изменения слага происходит через события @focus и @input на Input
 
+let urlTooltipClickHandler = null;
+
+// Обработчик обновления режима работы
+function handleModeUpdate(event) {
+  if (event.detail && event.detail.mode) {
+    operatingMode.value = event.detail.mode;
+  } else {
+    // Если режим не передан, загружаем заново
+    loadOperatingMode();
+  }
+}
+
+async function loadOperatingMode() {
+  try {
+    const { mode } = await api.getMode();
+    if (mode) operatingMode.value = mode;
+  } catch (e) {
+    console.error('Ошибка загрузки режима работы:', e);
+  }
+}
+
 onMounted(async () => {
+  // Загружаем режим работы
+  await loadOperatingMode();
+  
+  // Слушаем событие обновления режима
+  window.addEventListener('mr-ml-mode-updated', handleModeUpdate);
+  
+  // Обработчик клика вне URL tooltip
+  urlTooltipClickHandler = (e) => {
+    // Проверяем, что клик не по tooltip и не по кнопке открытия tooltip
+    if (tooltip.value.visible && tooltip.value.isUrl) {
+      // Проверяем, кликнут ли tooltip или элемент внутри него
+      const isClickInsideTooltip = e.target.closest('.bg-slate-800') !== null;
+      // Проверяем, кликнут ли счетчик URL (кнопка открытия tooltip)
+      const clickedElement = e.target.closest('[class*="cursor-pointer"]');
+      const isClickOnUrlCounter = clickedElement && 
+        (clickedElement.textContent?.includes('+') && clickedElement.textContent?.includes('URL'));
+      
+      if (!isClickInsideTooltip && !isClickOnUrlCounter) {
+        hideTooltip();
+      }
+    }
+  };
+  document.addEventListener('click', urlTooltipClickHandler, true);
   // Загружаем настройки колонок из localStorage
   const saved = localStorage.getItem('mr_ml_table_columns');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length === defaultColumns.length) {
-        // Восстанавливаем порядок и видимость из сохраненных данных
+        // Восстанавливаем порядок, видимость и ширину из сохраненных данных
         const savedKeys = parsed.map(c => c.key);
         const ordered = savedKeys.map(key => {
           const savedCol = parsed.find(c => c.key === key);
@@ -1595,7 +2184,8 @@ onMounted(async () => {
           if (defaultCol) {
             return {
               ...defaultCol,
-              visible: savedCol?.visible !== undefined ? savedCol.visible : defaultCol.visible
+              visible: savedCol?.visible !== undefined ? savedCol.visible : defaultCol.visible,
+              width: savedCol?.width || defaultCol.width || 'auto'
             };
           }
           return null;
@@ -1651,6 +2241,12 @@ watch(activeTab, (newTab) => {
 onUnmounted(() => {
   // Убираем обработчик закрытия меню, если он был добавлен
   document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+  // Убираем обработчик клика для URL tooltip
+  if (urlTooltipClickHandler) {
+    document.removeEventListener('click', urlTooltipClickHandler, true);
+  }
+  // Убираем обработчик обновления режима
+  window.removeEventListener('mr-ml-mode-updated', handleModeUpdate);
 });
 
 const tableFilteredItems = computed(() => {
@@ -1939,7 +2535,13 @@ async function loadFuture() {
       id: p.id,
       title: p.title?.rendered || p.title?.raw || '',
       slug: p.slug || '',
-      date: p.modified ? new Date(p.modified).toLocaleDateString('ru-RU') : ''
+      date: p.date ? new Date(p.date).toLocaleString('ru-RU', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }) : (p.modified ? new Date(p.modified).toLocaleDateString('ru-RU') : '')
     }));
   } catch (e) {
     console.error('Ошибка загрузки запланированных:', e);
@@ -2101,6 +2703,7 @@ function openBulkModal() {
   searchQuery.value = '';
   searchFolderQuery.value = '';
   searchSubdomainQuery.value = '';
+  bulk.status = 'publish'; // Сбрасываем статус на дефолтный
   bulkModalOpen.value = true;
 }
 
@@ -2281,24 +2884,110 @@ async function applyBulk() {
   bulkConfirmOpen.value = true;
 }
 
+function handleBulkAction() {
+  if (selectedIds.value.length === 0) {
+    showMessage('Выберите страницы для выполнения действия', 'error');
+    return;
+  }
+  
+  if (bulkAction.value === 'delete') {
+    // Показываем подтверждение массового удаления
+    bulkDeleteConfirmOpen.value = true;
+  } else if (bulkAction.value === 'edit') {
+    // Открываем попап массовых настроек
+    openBulkModal();
+  }
+}
+
+async function confirmBulkDelete() {
+  bulkDeleteConfirmOpen.value = false;
+  
+  try {
+    // Используем WordPress REST API напрямую для удаления
+    const deletePromises = selectedIds.value.map(pageId => {
+      return fetch(`${boot.restUrl}wp/v2/multiregional_page/${pageId}`, {
+        method: 'DELETE',
+        headers: { 
+          'X-WP-Nonce': boot.nonce,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ force: false }) // false = переместить в корзину
+      });
+    });
+    
+    const results = await Promise.all(deletePromises);
+    const successCount = results.filter(r => r.ok).length;
+    
+    if (successCount === selectedIds.value.length) {
+      showMessage(`Удалено страниц: ${successCount}`, 'success');
+    } else {
+      showMessage(`Удалено страниц: ${successCount} из ${selectedIds.value.length}`, 'warning');
+    }
+    
+    selectedIds.value = [];
+    await load();
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка массового удаления: ' + String(e.message || e), 'error');
+  }
+}
+
+function cancelBulkDelete() {
+  bulkDeleteConfirmOpen.value = false;
+}
+
 async function confirmBulk() {
   bulkConfirmOpen.value = false;
   
-  let saved = 0;
-  let errors = 0;
-  for (const id of bulk.selectedPageIds) {
-    const payload = { rule: bulk.rule, folders: bulk.folders, subdomains: bulk.subdomains };
-    const res = await fetch(`${boot.restUrl}mr-ml/v1/visibility/${id}`, {
-      method: 'POST',
-      headers: { 'X-WP-Nonce': boot.nonce, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+  try {
+    // Массовое изменение статуса
+    const statusPromises = bulk.selectedPageIds.map(pageId => {
+      const payload = { status: bulk.status };
+      // Если статус "future", нужно установить дату
+      if (bulk.status === 'future') {
+        if (bulk.date) {
+          // Преобразуем datetime-local в ISO формат для WordPress
+          const date = new Date(bulk.date);
+          payload.date = date.toISOString();
+        } else {
+          // Если дата не указана, используем завтрашний день
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          payload.date = tomorrow.toISOString();
+        }
+      }
+      return api.updatePage(pageId, payload);
     });
-    if (res.ok) saved++; else errors++;
+    
+    await Promise.all(statusPromises);
+    
+    // Массовое изменение видимости
+    let saved = 0;
+    let errors = 0;
+    for (const id of bulk.selectedPageIds) {
+      const payload = { rule: bulk.rule, folders: bulk.folders, subdomains: bulk.subdomains };
+      const res = await fetch(`${boot.restUrl}mr-ml/v1/visibility/${id}`, {
+        method: 'POST',
+        headers: { 'X-WP-Nonce': boot.nonce, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) saved++; else errors++;
+    }
+    
+    showMessage(`Готово: ${saved} сохранено, ${errors} ошибок`, saved > 0 ? 'success' : 'error');
+    closeBulkModal();
+    selectedIds.value = [];
+    await load();
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка массовых настроек: ' + String(e.message || e), 'error');
   }
-  showMessage(`Готово: ${saved} сохранено, ${errors} ошибок`, saved > 0 ? 'success' : 'error');
-  closeBulkModal();
-  await load();
-  selectedIds.value = [];
 }
 
 // Меню выбора способа редактирования
@@ -2661,6 +3350,101 @@ async function deleteFromTrashPermanent() {
   } catch (e) {
     showMessage('Ошибка удаления страницы: ' + String(e.message || e), 'error');
     cancelDeletePermanent();
+  }
+}
+
+async function publishFromMenu(pageId) {
+  editMenuId.value = null;
+  document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+  
+  // Находим страницу для показа в подтверждении
+  let page = null;
+  if (activeTab.value === 'draft') {
+    page = draftItems.value.find(p => p.id === pageId);
+  } else if (activeTab.value === 'pending') {
+    page = pendingItems.value.find(p => p.id === pageId);
+  } else if (activeTab.value === 'future') {
+    page = futureItems.value.find(p => p.id === pageId);
+  } else if (activeTab.value === 'pages') {
+    page = items.value.find(p => p.id === pageId);
+  }
+  
+  if (page) {
+    showPublishConfirm(page);
+  }
+}
+
+async function deleteFromMenu(pageId) {
+  editMenuId.value = null;
+  document.removeEventListener('click', closeEditMenuOnOutsideClick, true);
+  
+  // Находим страницу для показа в подтверждении
+  let page = null;
+  if (activeTab.value === 'draft') {
+    page = draftItems.value.find(p => p.id === pageId);
+  } else if (activeTab.value === 'pending') {
+    page = pendingItems.value.find(p => p.id === pageId);
+  } else if (activeTab.value === 'future') {
+    page = futureItems.value.find(p => p.id === pageId);
+  } else if (activeTab.value === 'pages') {
+    page = items.value.find(p => p.id === pageId);
+  }
+  
+  if (page) {
+    confirmDeletePage(page);
+  }
+}
+
+let publishEscHandler = null;
+
+function showPublishConfirm(page) {
+  publishConfirmPage.value = page;
+  
+  // Добавляем обработчик ESC
+  if (!publishEscHandler) {
+    publishEscHandler = (e) => {
+      if (e.key === 'Escape' && publishConfirmPage.value) {
+        cancelPublish();
+      }
+    };
+    document.addEventListener('keydown', publishEscHandler);
+  }
+}
+
+function cancelPublish() {
+  publishConfirmPage.value = null;
+  
+  // Удаляем обработчик ESC
+  if (publishEscHandler) {
+    document.removeEventListener('keydown', publishEscHandler);
+    publishEscHandler = null;
+  }
+}
+
+async function confirmPublish() {
+  if (!publishConfirmPage.value) return;
+  
+  const pageId = publishConfirmPage.value.id;
+  cancelPublish();
+  
+  try {
+    // Для записей со статусом "future" нужно убрать дату публикации
+    // WordPress REST API требует, чтобы при смене статуса с future на publish
+    // дата была установлена на текущую для немедленной публикации
+    const payload = { 
+      status: 'publish',
+      date: new Date().toISOString() // Устанавливаем текущую дату для немедленной публикации
+    };
+    
+    await api.updatePage(pageId, payload);
+    showMessage('Страница опубликована', 'success');
+    await load();
+    await loadTrash();
+    await loadDraft();
+    await loadPending();
+    await loadFuture();
+  } catch (e) {
+    showMessage('Ошибка публикации: ' + String(e.message || e), 'error');
   }
 }
 

@@ -47,7 +47,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue']);
 
 const modalClasses = computed(() => {
-  const base = 'bg-white rounded-lg p-6 shadow-lg max-h-[90vh] overflow-auto';
+  const base = 'bg-white rounded-lg px-6 pt-6 pb-0 shadow-lg max-h-[90vh] overflow-auto';
   
   const sizes = {
     sm: 'max-w-md w-full',

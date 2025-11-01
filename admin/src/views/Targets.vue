@@ -2,33 +2,17 @@
   <div>
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-medium">{{ tabLabel }}</h3>
-      <Button @click="showAddForm = !showAddForm">
-        {{ showAddForm ? 'Скрыть форму' : 'Добавить' }}
-      </Button>
     </div>
     <Alert v-if="error" type="error">{{ error }}</Alert>
     
-    <div v-if="showAddForm" class="flex gap-2 mb-4 p-3 border rounded bg-slate-50">
-      <Select v-if="isHybrid" v-model="draft.type">
-        <option value="both">Везде</option>
-        <option value="folder">Папка</option>
-        <option value="subdomain">Поддомен</option>
-      </Select>
-      <Input v-model="draft.slug" placeholder="Слаг" />
-      <Input v-model="draft.nominative" placeholder="Именительный (Москва)" />
-      <Input v-model="draft.dative" placeholder="Дательный (Москве)" />
-      <Input v-model="draft.genitive" placeholder="Родительный (Москвы)" />
-      <Button variant="success" @click="onCreate">Сохранить</Button>
-      <Button variant="secondary" @click="cancelAdd">Отмена</Button>
-    </div>
-    
-    <!-- Поиск -->
-    <div class="mb-4">
+    <!-- Поиск и кнопка добавления в один ряд -->
+    <div class="mb-4 flex items-center gap-2">
       <Input 
         v-model="searchQuery" 
         placeholder="Поиск..."
-        class="w-full"
+        class="flex-1"
       />
+      <Button @click="showAddModal = true">Добавить</Button>
     </div>
 
     <div class="overflow-x-auto">
@@ -151,12 +135,48 @@
         </template>
       </ShowMorePagination>
     </div>
+
+    <!-- Модальное окно для добавления -->
+    <Modal v-model="showAddModal" title="Добавить элемент" size="md">
+      <div class="space-y-4">
+        <div v-if="isHybrid">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Тип</label>
+          <Select v-model="draft.type" class="w-full">
+            <option value="both">Везде</option>
+            <option value="folder">Папка</option>
+            <option value="subdomain">Поддомен</option>
+          </Select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Слаг</label>
+          <Input v-model="draft.slug" placeholder="Слаг" class="w-full" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Именительный (Москва)</label>
+          <Input v-model="draft.nominative" placeholder="Именительный (Москва)" class="w-full" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Дательный (Москве)</label>
+          <Input v-model="draft.dative" placeholder="Дательный (Москве)" class="w-full" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Родительный (Москвы)</label>
+          <Input v-model="draft.genitive" placeholder="Родительный (Москвы)" class="w-full" />
+        </div>
+      </div>
+      
+      <!-- Фиксированные кнопки внутри попапа -->
+      <div class="sticky bottom-0 bg-white border-t border-slate-200 -mx-6 px-6 pt-4 pb-6 mt-6 flex gap-2 justify-end">
+        <Button variant="secondary" @click="cancelAdd">Отмена</Button>
+        <Button variant="success" @click="onCreate">Сохранить</Button>
+      </div>
+    </Modal>
   </div>
 </template>
 
 <script setup>
 import { inject, reactive, ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import { Button, Input, Select, ShowMorePagination, Alert } from '../components';
+import { Button, Input, Select, ShowMorePagination, Alert, Modal } from '../components';
 import { highlightText } from '../utils/highlight.js';
 const api = inject('api');
 
@@ -166,7 +186,7 @@ const subdomains = ref([]);
 const loading = ref(false);
 const draft = reactive({ type: 'both', slug: '', nominative: '', dative: '', genitive: '' });
 const error = ref('');
-const showAddForm = ref(false);
+const showAddModal = ref(false);
 const deleteConfirmId = ref(null);
 const deleteConfirmItem = computed(() => deleteConfirmId.value ? allItems.value.find(i => i.id === deleteConfirmId.value) : null);
 const isEditingId = ref(null);
@@ -379,7 +399,7 @@ async function onCreate() {
     draft.nominative = '';
     draft.dative = '';
     draft.genitive = '';
-    showAddForm.value = false;
+    showAddModal.value = false;
     showMessage('Элемент успешно создан', 'success');
   } catch (e) {
     showMessage('Ошибка создания: ' + String(e.message || e), 'error');
@@ -396,7 +416,7 @@ function cancelAdd() {
   draft.nominative = '';
   draft.dative = '';
   draft.genitive = '';
-  showAddForm.value = false;
+  showAddModal.value = false;
 }
 
 async function onUpdateType(item, newType) {

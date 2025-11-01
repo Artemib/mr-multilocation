@@ -475,6 +475,7 @@ function mr_ml_register_rest_routes(): void {
 						'id' => (int)$p->ID,
 						'title' => get_the_title($p),
 						'slug' => $p->post_name,
+						'status' => $p->post_status,
 						'seo_title' => $seo_title ?: '',
 						'seo_description' => $seo_description ?: '',
 						'visibility' => is_array($vis) ? $vis : array(),
